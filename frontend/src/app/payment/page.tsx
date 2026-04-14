@@ -3,32 +3,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@/context/WalletContext';
-import { ethers } from 'ethers';
 import { supabase } from '@/lib/supabase';
 import { useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { useSearchParams } from 'next/navigation';
+import { apiUrl } from '@/lib/api';
 
-type ChainInfo = {
-  name: string;
-  fee: string;
-  time: string;
-  status: 'tersedia' | 'tidak punya' | '✓ Dipilih';
-  feeRaw: number;
+type RouteCandidate = {
+  token: string;
+  chain: string;
+  gasEstimateIdr: number;
+  amountToken: number;
+  score: number;
+  gasEfficiency: number;
+  speedScore: number;
+  stableBonus: number;
+  liquidityScore: number;
 };
 
 export default function PaymentFlow() {
   const { address, isGuest } = useWallet();
-  const [step, setStep] = useState<'analyzing' | 'decision' | 'confirmed'>('analyzing');
+  const [step, setStep] = useState<'input' | 'analyzing' | 'decision' | 'confirmed'>('input');
   const [logs, setLogs] = useState<string[]>([]);
   const [bestRoute, setBestRoute] = useState<any>(null);
+  const [candidates, setCandidates] = useState<RouteCandidate[]>([]);
   const [gasPrices, setGasPrices] = useState<Record<string, number>>({});
   const [explanation, setExplanation] = useState<string>("");
   const [merchantData, setMerchantData] = useState<any>(null);
-  const [loadingRealData, setLoadingRealData] = useState(true);
+  const [loadingRealData, setLoadingRealData] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const amount = 2500; // Fixed amount as requested
+  const [amount, setAmount] = useState<number>(25000);
   const currency = 'IDR';
   const searchParams = useSearchParams();
   const merchantId = searchParams?.get('id') || 'm_nabiel_001';
@@ -43,107 +48,118 @@ export default function PaymentFlow() {
 
   const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+  // Fetch merchant data on mount
   useEffect(() => {
-    if (hasRun.current) return;
-    hasRun.current = true;
-
-    async function runAIEngine() {
+    async function fetchMerchant() {
       try {
-        setLoadingRealData(true);
-        
-        // Step 0: Fetch Merchant
-        addLog(`🔍 Mencari merchant ID: ${merchantId}...`);
-        const merchantRes = await fetch(`http://127.0.0.1:3001/api/merchants/${merchantId}`);
+        const merchantRes = await fetch(apiUrl(`/merchants/${merchantId}`));
         const merchantResult = await merchantRes.json();
         if (merchantResult.success) {
           setMerchantData(merchantResult.merchant);
-          addLog(`🏢 Merchant ditemukan: ${merchantResult.merchant.name}`);
-        } else {
-          addLog("⚠️ Merchant tidak ditemukan di database.");
         }
-        await sleep(600);
-
-        addLog("🛡️ Menghubungkan ke secure vault wallet Anda...");
-        await sleep(800);
-        
-        // Step 2: Scan
-        addLog("💰 Memindai saldo multichain (Ethereum, Polygon, Base, Arbitrum)...");
-        const scanRes = await fetch(`http://127.0.0.1:3001/api/scan/${address}`);
-        const tokens = await scanRes.json();
-        await sleep(500);
-        addLog(`✅ Scan selesai. Ditemukan ${tokens.length} aset aktif di 5 jaringan.`);
-        await sleep(700);
-
-        // Step 3: Gas Prices Fetch
-        addLog("📡 Mengambil data gas price real-time dari Alchemy...");
-        const gasRes = await fetch(`http://127.0.0.1:3001/api/gas-prices`);
-        const gasData = await gasRes.json();
-        setGasPrices(gasData);
-        await sleep(600);
-
-        // Step 4: Routing
-        addLog("📊 Menjalankan skor efisiensi AI dan analisa rute...");
-        const routeRes = await fetch(`http://127.0.0.1:3001/api/route`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokens, amount, currency })
-        });
-        
-        if (!routeRes.ok) {
-          throw new Error('API_ROUTE_ERROR');
-        }
-
-        const routeResponse = await routeRes.json();
-        const routeData = routeResponse.data;
-        
-        if (!routeData) {
-          throw new Error('SALDO_INSUFFICIENT');
-        }
-
-        setBestRoute(routeData);
-        await sleep(600);
-        addLog(`🤖 Keputusan Agent: Menggunakan ${routeData.token} di network ${routeData.chain}.`);
-        await sleep(700);
-
-        // Step 5: Explanation
-        addLog("✨ Gemini 1.5 Flash sedang menyusun narasi keputusan...");
-        if (routeData) {
-          const explainRes = await fetch(`http://127.0.0.1:3001/api/explain`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              routeData, 
-              merchantName: merchantData?.name || "Merchant", 
-              amount, 
-              currency 
-            })
-          });
-          const explainData = await explainRes.json();
-          setExplanation(explainData.explanation);
-        }
-        await sleep(500);
-        addLog("🚀 Semua kalkulasi selesai. Menuju panel keputusan.");
-        await sleep(1000);
-
-        // Transition to next step
-        setStep('decision');
-      } catch (e: any) {
-        console.error("Gagal koordinasi dengan AI Agent:", e);
-        if (e.message === 'SALDO_INSUFFICIENT') {
-          addLog("⚠️ Saldo Anda tidak mencukupi di jaringan manapun.");
-          addLog("💡 Silakan topup dompet Anda dengan minimal Rp 55.000.");
-        } else {
-          addLog("❌ Terjadi kendala koneksi dengan AI Node.");
-        }
-      } finally {
-        setLoadingRealData(false);
+      } catch (e) {
+        console.error("Failed to fetch merchant:", e);
       }
     }
-    
-    if (step === 'analyzing' && address) {
-       runAIEngine();
+    fetchMerchant();
+  }, [merchantId]);
+
+  const startAIEngine = async () => {
+    if (amount <= 0) return;
+    setStep('analyzing');
+    setLogs([]);
+    hasRun.current = true;
+
+    try {
+      setLoadingRealData(true);
+      
+      // Step 0: Merchant info
+      const merchantName = merchantData?.name || 'Merchant';
+      addLog(`🏢 Merchant: ${merchantName}`);
+      addLog(`💵 Nominal pembayaran: Rp ${amount.toLocaleString('id-ID')}`);
+      await sleep(600);
+
+      addLog("🛡️ Menghubungkan ke secure vault wallet Anda...");
+      await sleep(800);
+      
+      // Step 2: Scan
+      addLog("💰 Memindai saldo multichain (Ethereum, Polygon, Base, Arbitrum)...");
+      const scanRes = await fetch(apiUrl(`/scan/${address}`));
+      const tokens = await scanRes.json();
+      await sleep(500);
+      addLog(`✅ Scan selesai. Ditemukan ${tokens.length} aset aktif di 5 jaringan.`);
+      await sleep(700);
+
+      // Step 3: Gas Prices Fetch
+      addLog("📡 Mengambil data gas price real-time dari Alchemy...");
+      const gasRes = await fetch(apiUrl('/gas-prices'));
+      const gasData = await gasRes.json();
+      setGasPrices(gasData);
+      await sleep(600);
+
+      // Step 4: Routing — now returns ALL candidates
+      addLog("📊 Menjalankan skor efisiensi AI dan analisa rute...");
+      const routeRes = await fetch(apiUrl('/route'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tokens, amount, currency })
+      });
+      
+      if (!routeRes.ok) {
+        throw new Error('API_ROUTE_ERROR');
+      }
+
+      const routeResponse = await routeRes.json();
+      const routeData = routeResponse.data;
+      const allCandidates: RouteCandidate[] = routeResponse.candidates || [];
+      
+      if (!routeData) {
+        throw new Error('SALDO_INSUFFICIENT');
+      }
+
+      setBestRoute(routeData);
+      setCandidates(allCandidates);
+      await sleep(600);
+      addLog(`🤖 AI mengevaluasi ${allCandidates.length} rute pembayaran.`);
+      await sleep(400);
+      addLog(`✅ Keputusan Agent: ${routeData.token} di ${routeData.chain} (Skor: ${(routeData.score * 100).toFixed(0)}%)`);
+      await sleep(700);
+
+      // Step 5: Explanation — now with comparative data
+      addLog("✨ Gemini 1.5 Flash menyusun narasi perbandingan rute...");
+      if (routeData) {
+        const explainRes = await fetch(apiUrl('/explain'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            routeData, 
+            merchantName, 
+            amount, 
+            currency,
+            candidates: allCandidates,
+          })
+        });
+        const explainData = await explainRes.json();
+        setExplanation(explainData.explanation);
+      }
+      await sleep(500);
+      addLog("🚀 Semua kalkulasi selesai. Menuju panel keputusan.");
+      await sleep(1000);
+
+      // Transition to next step
+      setStep('decision');
+    } catch (e: any) {
+      console.error("Gagal koordinasi dengan AI Agent:", e);
+      if (e.message === 'SALDO_INSUFFICIENT') {
+        addLog("⚠️ Saldo Anda tidak mencukupi di jaringan manapun.");
+        addLog("💡 Silakan topup dompet Anda dengan minimal Rp 55.000.");
+      } else {
+        addLog("❌ Terjadi kendala koneksi dengan AI Node.");
+      }
+    } finally {
+      setLoadingRealData(false);
     }
-  }, [address]);
+  };
 
   const { writeContractAsync } = useWriteContract();
 
@@ -153,6 +169,7 @@ export default function PaymentFlow() {
       setLogs(prev => [...prev, "🚀 Memproses pembayaran..."]);
       
       let finalHash = "";
+      let usedRoute = bestRoute;
       
       if (!isGuest && address) {
         setLogs(prev => [...prev, "🔐 Menghubungkan ke Wallet..."]);
@@ -168,28 +185,44 @@ export default function PaymentFlow() {
           }
         ];
 
-        try {
-          // Ambil amountToken dari backend yang sudah dikalkulasi real-time
-          const amountTokenStr = bestRoute?.amountToken?.toString() || "0";
-          
-          setLogs(prev => [...prev, "✍️ Silakan tanda tangani di MetaMask..."]);
-          
-          const hash = await writeContractAsync({
-            address: CONTRACT_ADDRESS,
-            abi: ABI,
-            functionName: 'payNative',
-            args: [merchantId],
-            value: parseEther(amountTokenStr),
-            chainId: 84532 // Explicitly Base Sepolia
-          });
+        // Try primary route, fallback to #2 if fails
+        let attemptIndex = 0;
+        const maxAttempts = Math.min(candidates.length, 2);
 
-          setLogs(prev => [...prev, "⏳ Menunggu konfirmasi jaringan..."]);
-          finalHash = hash;
-          setLogs(prev => [...prev, "✅ Transaksi dikirim ke Base Sepolia!"]);
-        } catch (e: any) {
-          console.error("Wagmi Error:", e);
-          setLogs(prev => [...prev, "❌ Pembayaran dibatalkan atau gagal."]);
-          return;
+        while (attemptIndex < maxAttempts) {
+          try {
+            const currentRoute = attemptIndex === 0 ? bestRoute : candidates[attemptIndex];
+            if (attemptIndex > 0) {
+              setLogs(prev => [...prev, `⚡ AI otomatis beralih ke rute alternatif: ${currentRoute.token} / ${currentRoute.chain}...`]);
+              usedRoute = currentRoute;
+              setBestRoute(currentRoute);
+            }
+
+            const amountTokenStr = currentRoute?.amountToken?.toString() || "0";
+            setLogs(prev => [...prev, "✍️ Silakan tanda tangani di MetaMask..."]);
+            
+            const hash = await writeContractAsync({
+              address: CONTRACT_ADDRESS,
+              abi: ABI,
+              functionName: 'payNative',
+              args: [merchantId],
+              value: parseEther(amountTokenStr),
+              chainId: 84532
+            });
+
+            setLogs(prev => [...prev, "⏳ Menunggu konfirmasi jaringan..."]);
+            finalHash = hash;
+            setLogs(prev => [...prev, "✅ Transaksi dikirim ke Base Sepolia!"]);
+            break; // Success, exit loop
+          } catch (e: any) {
+            console.error(`Route attempt ${attemptIndex + 1} failed:`, e);
+            if (attemptIndex === maxAttempts - 1) {
+              setLogs(prev => [...prev, "❌ Pembayaran dibatalkan atau gagal."]);
+              return;
+            }
+            setLogs(prev => [...prev, `⚠️ Rute ${attemptIndex + 1} gagal. Mencoba rute alternatif...`]);
+            attemptIndex++;
+          }
         }
       } else {
         if (isGuest) {
@@ -209,12 +242,12 @@ export default function PaymentFlow() {
         id: `tx_${Date.now()}`,
         merchant_id: merchantId,
         user_address: address,
-        amount_idr: currency === 'IDR' ? amount : amount * 16000, // Legacy support for DB
-        amount_token: bestRoute?.amountToken || 0,
-        token_symbol: bestRoute?.token || 'ETH',
-        chain: bestRoute?.chain || 'Base',
+        amount_idr: amount,
+        amount_token: usedRoute?.amountToken || 0,
+        token_symbol: usedRoute?.token || 'ETH',
+        chain: usedRoute?.chain || 'Base',
         status: 'confirmed',
-        ai_explanation: explanation || bestRoute?.reasoning,
+        ai_explanation: explanation || usedRoute?.reasoning,
         tx_hash: finalHash
       });
 
@@ -231,21 +264,15 @@ export default function PaymentFlow() {
     }
   };
 
-  const STATIC_CHAINS = ['Ethereum', 'Polygon', 'Base', 'Arbitrum', 'Base Sepolia', 'BSC'];
-  
-  const CHAINS: ChainInfo[] = STATIC_CHAINS.map(name => {
-    const feeRaw = gasPrices[name] || 0;
-    // Handle matching for both mainnet and testnet names if they are slightly different
-    const isSelected = bestRoute?.chain === name;
-    
-    return {
-      name,
-      fee: feeRaw > 0 ? `Rp ${feeRaw.toLocaleString('id-ID')}` : '---',
-      time: (name === 'Ethereum') ? '12 dtk' : '2 dtk',
-      status: isSelected ? '✓ Dipilih' : 'tersedia',
-      feeRaw
-    };
-  });
+  // Score bar component
+  const ScoreBar = ({ value, color }: { value: number; color: string }) => (
+    <div className="w-full bg-slate-100 rounded-full h-1.5">
+      <div 
+        className={`h-1.5 rounded-full transition-all duration-700 ${color}`}
+        style={{ width: `${Math.max(value * 100, 4)}%` }}
+      />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4 md:p-10 flex flex-col items-center justify-center relative overflow-hidden">
@@ -256,26 +283,103 @@ export default function PaymentFlow() {
 
         {/* Step Indicator */}
         <div className="flex justify-between items-center px-6">
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${step === 'analyzing' ? 'bg-blue-600 scale-125 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-slate-300'}`}></div>
-            <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${step === 'analyzing' ? 'text-blue-600' : 'text-slate-400'}`}>Analisis</span>
-          </div>
-          <div className="flex-1 h-[1px] bg-slate-200 mx-4"></div>
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${step === 'decision' ? 'bg-blue-600 scale-125 shadow-[0_0_10px_rgba(37,99,235,0.4)]' : 'bg-slate-300'}`}></div>
-            <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${step === 'decision' ? 'text-blue-600' : 'text-slate-400'}`}>Keputusan</span>
-          </div>
-          <div className="flex-1 h-[1px] bg-slate-200 mx-4"></div>
-          <div className="flex items-center gap-2">
-            <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${step === 'confirmed' ? 'bg-emerald-500 scale-125 shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-slate-300'}`}></div>
-            <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${step === 'confirmed' ? 'text-emerald-500' : 'text-slate-400'}`}>Selesai</span>
-          </div>
+          {[
+            { key: 'input', label: 'Input' },
+            { key: 'analyzing', label: 'Analisis' },
+            { key: 'decision', label: 'Keputusan' },
+            { key: 'confirmed', label: 'Selesai' },
+          ].map((s, i, arr) => (
+            <React.Fragment key={s.key}>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
+                  step === s.key 
+                    ? s.key === 'confirmed' 
+                      ? 'bg-emerald-500 scale-125 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+                      : 'bg-blue-600 scale-125 shadow-[0_0_10px_rgba(37,99,235,0.4)]'
+                    : 'bg-slate-300'
+                }`}></div>
+                <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${
+                  step === s.key 
+                    ? s.key === 'confirmed' ? 'text-emerald-500' : 'text-blue-600' 
+                    : 'text-slate-400'
+                }`}>{s.label}</span>
+              </div>
+              {i < arr.length - 1 && <div className="flex-1 h-[1px] bg-slate-200 mx-4"></div>}
+            </React.Fragment>
+          ))}
         </div>
 
         {/* MAIN PANEL */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-6 md:p-10 border border-white flex flex-col min-h-[480px]">
           
+          {/* STEP: INPUT AMOUNT */}
+          {step === 'input' && (
+            <div className="flex flex-col flex-1 animate-fade-in">
+              <div className="mb-8 text-center">
+                <div className="inline-flex p-3 bg-blue-50 rounded-2xl mb-4 border border-blue-100">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {merchantData?.name || 'Memuat merchant...'}
+                </h2>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
+                  ID: {merchantId}
+                </p>
+              </div>
 
+              <div className="space-y-4 max-w-sm mx-auto w-full">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Masukkan Nominal (Rupiah)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">Rp</span>
+                    <input
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(Number(e.target.value))}
+                      className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-14 text-2xl font-bold text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none transition"
+                      placeholder="25000"
+                      min={1000}
+                    />
+                  </div>
+                </div>
+
+                {/* Quick amount buttons */}
+                <div className="flex gap-2">
+                  {[10000, 25000, 50000, 100000].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setAmount(v)}
+                      className={`flex-1 py-2 text-xs font-bold rounded-xl border-2 transition ${
+                        amount === v 
+                          ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {(v / 1000)}K
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={startAIEngine}
+                  disabled={amount <= 0 || !address}
+                  className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl text-sm mt-4 ${
+                    amount > 0 && address
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 transform active:scale-95'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  🤖 Analisis Pembayaran dengan AI
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP: ANALYZING */}
           {step === 'analyzing' && (
             <div className="flex flex-col flex-1 animate-fade-in">
               <div className="mb-10 text-center">
@@ -285,7 +389,7 @@ export default function PaymentFlow() {
                   </svg>
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">AI Agent memindai blockchain...</h2>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time Multichain Scan</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time Multichain Scan • Rp {amount.toLocaleString('id-ID')}</p>
               </div>
 
               <div className="space-y-3 font-medium text-slate-400 text-[11px] max-w-sm mx-auto w-full">
@@ -297,8 +401,8 @@ export default function PaymentFlow() {
                 ))}
               </div>
 
-              {/* Tombol kembali jika error atau loading selesai tapi tidak lanjut */}
-              {!loadingRealData && (
+              {/* Tombol kembali jika error */}
+              {!loadingRealData && step === 'analyzing' && (
                 <div className="mt-8 animate-fade-in flex justify-center">
                   <Link href="/user" className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors font-bold text-[10px] uppercase tracking-widest border border-slate-100 px-4 py-2 rounded-xl">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -309,36 +413,59 @@ export default function PaymentFlow() {
             </div>
           )}
 
+          {/* STEP: DECISION — with AI Decision Matrix */}
           {step === 'decision' && bestRoute && (
             <div className="flex flex-col flex-1 animate-fade-in">
               <div className="mb-6 flex justify-between items-end">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight text-center">{merchantData?.name || "Merchant"}</h2>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Berdasarkan Alchemy & Route scoring</p>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight">{merchantData?.name || "Merchant"}</h2>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                    {candidates.length} rute dievaluasi • AI Routing Engine
+                  </p>
                 </div>
-                <div className="bg-blue-50 px-2 py-1 rounded text-[8px] font-black text-blue-600 uppercase border border-blue-100">Live Snapshot</div>
+                <div className="bg-blue-50 px-2 py-1 rounded text-[8px] font-black text-blue-600 uppercase border border-blue-100">Live Data</div>
               </div>
 
+              {/* AI DECISION MATRIX — shows all evaluated routes */}
               <div className="overflow-hidden rounded-[2rem] border border-slate-100 mb-6 bg-slate-50/30">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-[10px] min-w-[320px]">
+                  <table className="w-full text-left text-[10px] min-w-[380px]">
                     <thead>
                       <tr className="bg-slate-50 text-slate-400 font-bold uppercase text-[8px] border-b border-slate-100">
-                        <th className="px-5 py-3">Chain</th>
-                        <th className="px-5 py-3">Gas Fee</th>
-                        <th className="px-5 py-3">Speed</th>
-                        <th className="px-5 py-3 text-right">Status</th>
+                        <th className="px-4 py-3">Rute</th>
+                        <th className="px-4 py-3">Gas Fee</th>
+                        <th className="px-4 py-3">Skor AI</th>
+                        <th className="px-4 py-3 text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {CHAINS.map((c, i) => (
-                        <tr key={i} className={`transition-colors duration-300 ${c.status === '✓ Dipilih' ? 'bg-blue-600/5' : 'hover:bg-slate-100/50'}`}>
-                          <td className="px-5 py-3 font-bold text-slate-800">{c.name}</td>
-                          <td className="px-5 py-3 font-medium text-slate-500">{c.fee}</td>
-                          <td className="px-5 py-3 font-medium text-slate-500">{c.time}</td>
-                          <td className="px-5 py-3 text-right">
-                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase inline-block ${c.status === '✓ Dipilih' ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-200 text-slate-500'}`}>
-                              {c.status}
+                      {candidates.map((c, i) => (
+                        <tr key={i} className={`transition-colors duration-300 ${i === 0 ? 'bg-blue-600/5' : 'hover:bg-slate-100/50'}`}>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800">{c.token}</div>
+                            <div className="text-[8px] text-slate-400 font-medium">{c.chain}</div>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-slate-500">
+                            Rp {c.gasEstimateIdr.toLocaleString('id-ID')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16">
+                                <ScoreBar 
+                                  value={c.score} 
+                                  color={i === 0 ? 'bg-blue-600' : 'bg-slate-300'} 
+                                />
+                              </div>
+                              <span className={`text-[9px] font-bold ${i === 0 ? 'text-blue-600' : 'text-slate-400'}`}>
+                                {(c.score * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase inline-block ${
+                              i === 0 ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-200 text-slate-500'
+                            }`}>
+                              {i === 0 ? '✓ Dipilih' : `#${i + 1}`}
                             </span>
                           </td>
                         </tr>
@@ -348,6 +475,25 @@ export default function PaymentFlow() {
                 </div>
               </div>
 
+              {/* Score Breakdown for winner */}
+              {candidates[0] && (
+                <div className="grid grid-cols-4 gap-3 mb-6">
+                  {[
+                    { label: 'Gas', value: candidates[0].gasEfficiency, color: 'bg-emerald-500' },
+                    { label: 'Speed', value: candidates[0].speedScore, color: 'bg-blue-500' },
+                    { label: 'Stability', value: candidates[0].stableBonus, color: 'bg-purple-500' },
+                    { label: 'Liquidity', value: candidates[0].liquidityScore, color: 'bg-amber-500' },
+                  ].map(m => (
+                    <div key={m.label} className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mb-1">{m.label}</p>
+                      <p className="text-sm font-bold text-slate-900 mb-1">{(m.value * 100).toFixed(0)}%</p>
+                      <ScoreBar value={m.value} color={m.color} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Final Decision Card */}
               <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] p-6 text-white mb-6 border border-white/5 relative overflow-hidden shadow-2xl">
                 <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-blue-500 rounded-full blur-[70px] opacity-30"></div>
                 <h3 className="text-[8px] font-bold uppercase text-slate-500 mb-4 flex items-center gap-2 tracking-widest">
@@ -360,16 +506,23 @@ export default function PaymentFlow() {
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total (IDR)</p>
-                    <h2 className="text-3xl font-bold mb-1">{currencySymbol} {amount.toLocaleString()}</h2>
+                    <h2 className="text-3xl font-bold mb-1">{currencySymbol} {amount.toLocaleString('id-ID')}</h2>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-blue-50/50 border border-blue-100/50 p-4 rounded-2xl mb-8 relative">
-                <p className="text-[11px] text-blue-800 font-bold italic leading-[1.6] text-center">
-                  "{bestRoute.reasoning}"
-                </p>
-              </div>
+              {/* AI Explanation — now comparative */}
+              {explanation && (
+                <div className="bg-blue-50/50 border border-blue-100/50 p-4 rounded-2xl mb-6 relative">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <span className="text-[8px] font-black uppercase text-blue-600 tracking-widest">Gemini AI Insight</span>
+                  </div>
+                  <p className="text-[11px] text-blue-800 font-bold italic leading-[1.6]">
+                    &ldquo;{explanation}&rdquo;
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={handleConfirm}
@@ -395,6 +548,7 @@ export default function PaymentFlow() {
             </div>
           )}
 
+          {/* STEP: CONFIRMED */}
           {step === 'confirmed' && (
             <div className="flex flex-col flex-1 animate-fade-in py-4">
               <div className="flex items-center gap-4 mb-8 bg-emerald-50/50 p-5 rounded-[2rem] border border-emerald-100">
@@ -411,7 +565,7 @@ export default function PaymentFlow() {
                 <div className="bg-slate-50/50 rounded-[2rem] p-6 border border-slate-100">
                   <div className="grid grid-cols-2 gap-y-4 text-xs font-medium">
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Nominal</div>
-                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">{currencySymbol} {amount.toLocaleString()}</div>
+                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">{currencySymbol} {amount.toLocaleString('id-ID')}</div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Sumber Dana</div>
                     <div className="text-right font-bold text-slate-900 leading-tight">
@@ -420,9 +574,30 @@ export default function PaymentFlow() {
                     </div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Biaya Gas (Est)</div>
-                    <div className="text-right font-bold text-emerald-600">Rp {bestRoute?.gasEstimateIdr.toLocaleString('id-ID')}</div>
+                    <div className="text-right font-bold text-emerald-600">Rp {bestRoute?.gasEstimateIdr?.toLocaleString('id-ID')}</div>
+
+                    <div className="text-slate-400 font-bold uppercase text-[9px]">Rute Dievaluasi</div>
+                    <div className="text-right font-bold text-slate-900">{candidates.length} rute</div>
                   </div>
                 </div>
+
+                {/* TX Hash with explorer link */}
+                {txHash && (
+                  <div className="bg-white border border-slate-100 p-4 rounded-2xl">
+                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-2">TX Hash</p>
+                    <p className="text-[10px] font-mono text-slate-600 break-all bg-slate-50 p-2 rounded-lg border border-slate-100">{txHash}</p>
+                    {!isGuest && (
+                      <a 
+                        href={`https://sepolia.basescan.org/tx/${txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 mt-2 hover:text-blue-800 transition"
+                      >
+                        Lihat di BaseScan Explorer →
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
@@ -431,7 +606,7 @@ export default function PaymentFlow() {
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   </div>
                   <p className="text-xs text-slate-700 font-bold leading-[1.7] italic">
-                    "{explanation || "AI sedang memberikan penjelasan..."}"
+                    &ldquo;{explanation || "AI sedang memberikan penjelasan..."}&rdquo;
                   </p>
                 </div>
               </div>
@@ -448,7 +623,7 @@ export default function PaymentFlow() {
 
         <div className="text-center pb-8 opacity-40">
           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-loose">
-            AI Execution Engine v1.0 • Built on Base & Polygon
+            AI Execution Engine v2.0 • Multichain Route Optimizer
           </p>
         </div>
       </div>

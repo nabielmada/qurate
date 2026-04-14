@@ -12,6 +12,24 @@ export interface RouteData {
   reasoning: string;
 }
 
+export interface RouteCandidate {
+  token: string;
+  chain: string;
+  gasEstimateIdr: number;
+  amountToken: number;
+  score: number;
+  // Score breakdown per component — visible to frontend for AI decision matrix
+  gasEfficiency: number;
+  speedScore: number;
+  stableBonus: number;
+  liquidityScore: number;
+}
+
+export interface RouteResult {
+  best: RouteData;
+  candidates: RouteCandidate[];
+}
+
 @Injectable()
 export class AiRouterService {
   private readonly alchemyKey: string;
@@ -92,8 +110,15 @@ export class AiRouterService {
 
   /**
    * 2. Fungsi calculateScore(token, chain, gasPrice, speed)
+   * Returns composite score AND per-component breakdown for AI decision transparency
    */
-  calculateScore(token: string, chain: string, gasPrice: number, speed: number): number {
+  calculateScore(token: string, chain: string, gasPrice: number, speed: number): {
+    total: number;
+    gasEfficiency: number;
+    speedScore: number;
+    stableBonus: number;
+    liquidityScore: number;
+  } {
     // Asumsi biaya gas tertinggi yg ditoleransi = Rp 50.000
     const gasEfficiency = Math.max(0, 1 - (gasPrice / 50000));
     
@@ -106,16 +131,17 @@ export class AiRouterService {
     // Liquidity score default 1.0 untuk token-token dominan
     const liquidityScore = 1.0;
 
-    // Formula komposit dari PRD
-    const score = (0.4 * gasEfficiency) + (0.3 * speedScore) + (0.2 * stableBonus) + (0.1 * liquidityScore);
+    // Formula komposit: weighted multi-variable optimization
+    const total = (0.4 * gasEfficiency) + (0.3 * speedScore) + (0.2 * stableBonus) + (0.1 * liquidityScore);
     
-    return score;
+    return { total, gasEfficiency, speedScore, stableBonus, liquidityScore };
   }
 
   /**
    * 3. Fungsi findOptimalRoute(walletTokens, amount, currency)
+   * Returns the best route AND all evaluated candidates with score breakdowns
    */
-  async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'IDR'): Promise<RouteData | null> {
+  async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'IDR'): Promise<RouteResult | null> {
     // KONVERSI MATA UANG KE USD
     const amountUSD = await this.currencyService.convertToUSD(amount, currency);
     
@@ -135,8 +161,8 @@ export class AiRouterService {
     const coingeckoIds = Array.from(new Set(eligibleTokens.map(t => CHAIN_CONFIG[t.chain].coingeckoId)));
     const tokenPricesUsd = await this.currencyService.getTokenPrices(coingeckoIds);
     
-    let bestRoute: RouteData | null = null;
-    let highestScore = -1;
+    // Evaluate ALL candidates with full score breakdown
+    const candidates: RouteCandidate[] = [];
 
     for (const token of eligibleTokens) {
       const gPrice = gasPrices[token.chain] || 50000;
@@ -148,21 +174,34 @@ export class AiRouterService {
       // Hitung amountToken: (IDR / IDR_per_USD) / USD_per_Token
       const amountToken = (amount / idrRate) / tokenPriceUsd;
 
-      const score = this.calculateScore(token.symbol, token.chain, gPrice, speed);
+      const scoreResult = this.calculateScore(token.symbol, token.chain, gPrice, speed);
       
-      if (score > highestScore) {
-        highestScore = score;
-        bestRoute = {
-          token: token.symbol,
-          chain: token.chain,
-          gasEstimateIdr: gPrice,
-          amountToken: Number(amountToken.toFixed(8)), // Presisi 8 desimal untuk crypto
-          score: score,
-          reasoning: `Skor: ${score.toFixed(2)}. ${token.symbol} / ${token.chain} dipilih karena gas fee rendah dan konversi stabil.`
-        };
-      }
+      candidates.push({
+        token: token.symbol,
+        chain: token.chain,
+        gasEstimateIdr: gPrice,
+        amountToken: Number(amountToken.toFixed(8)),
+        score: scoreResult.total,
+        gasEfficiency: scoreResult.gasEfficiency,
+        speedScore: scoreResult.speedScore,
+        stableBonus: scoreResult.stableBonus,
+        liquidityScore: scoreResult.liquidityScore,
+      });
     }
 
-    return bestRoute;
+    // Sort by score descending — best route first
+    candidates.sort((a, b) => b.score - a.score);
+
+    const winner = candidates[0];
+    const best: RouteData = {
+      token: winner.token,
+      chain: winner.chain,
+      gasEstimateIdr: winner.gasEstimateIdr,
+      amountToken: winner.amountToken,
+      score: winner.score,
+      reasoning: `Skor efisiensi: ${(winner.score * 100).toFixed(0)}%. ${winner.token} di ${winner.chain} dipilih dari ${candidates.length} rute yang dievaluasi.`,
+    };
+
+    return { best, candidates };
   }
 }

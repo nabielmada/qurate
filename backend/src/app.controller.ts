@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { AppService } from './app.service';
 import { WalletScannerService, TokenBalance } from './services/wallet-scanner.service';
-import { AiRouterService, RouteData } from './services/ai-router.service';
+import { AiRouterService, RouteData, RouteCandidate } from './services/ai-router.service';
 import { AiExplainerService } from './services/ai-explainer.service';
 import { CurrencyService } from './services/currency.service';
 import { MerchantService } from './services/merchant.service';
@@ -23,14 +23,14 @@ export class AppController {
   }
 
   @Post('route')
-  async findRoute(@Body() body: { tokens: TokenBalance[], amount: number, currency: string }): Promise<{ data: RouteData | null }> {
-    const route = await this.aiRouter.findOptimalRoute(body.tokens, body.amount, body.currency);
-    return { data: route };
+  async findRoute(@Body() body: { tokens: TokenBalance[], amount: number, currency: string }): Promise<{ data: RouteData | null, candidates: RouteCandidate[] }> {
+    const result = await this.aiRouter.findOptimalRoute(body.tokens, body.amount, body.currency);
+    return { data: result?.best || null, candidates: result?.candidates || [] };
   }
 
   @Post('explain')
-  async explainRoute(@Body() body: { routeData: RouteData, merchantName: string, amount: number, currency: string }): Promise<{ explanation: string }> {
-    const explanation = await this.aiExplainer.explainDecision(body.routeData, body.merchantName, body.amount, body.currency);
+  async explainRoute(@Body() body: { routeData: RouteData, merchantName: string, amount: number, currency: string, candidates?: RouteCandidate[] }): Promise<{ explanation: string }> {
+    const explanation = await this.aiExplainer.explainDecision(body.routeData, body.merchantName, body.amount, body.currency, body.candidates || []);
     return { explanation };
   }
 

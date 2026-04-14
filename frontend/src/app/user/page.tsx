@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@/context/WalletContext';
 import { supabase } from '@/lib/supabase';
+import { apiUrl } from '@/lib/api';
 
 export default function UserDashboard() {
   const { address, isGuest, logout } = useWallet();
@@ -41,7 +42,7 @@ export default function UserDashboard() {
         setLoading(true);
 
         // 1. Fetch Balances from Backend
-        const res = await fetch(`http://127.0.0.1:3001/api/scan/${address}`);
+        const res = await fetch(apiUrl(`/scan/${address}`));
         const balanceData = await res.json();
         
         if (!Array.isArray(balanceData)) {
@@ -70,7 +71,7 @@ export default function UserDashboard() {
         }
 
         // 3. Fetch Rates
-        const ratesRes = await fetch(`http://127.0.0.1:3001/api/rates`);
+        const ratesRes = await fetch(apiUrl('/rates'));
         const ratesData = await ratesRes.json();
         if (ratesData) setRates(ratesData);
       } catch (err) {

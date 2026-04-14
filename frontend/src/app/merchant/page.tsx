@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import MerchantQR from '@/components/MerchantQR';
+import StaticMerchantQR from '@/components/StaticMerchantQR';
 
 export default function MerchantDashboard() {
   const [amount, setAmount] = useState<number>(25000);
@@ -95,16 +96,26 @@ export default function MerchantDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="text-center py-8 animate-fade-in">
-                <div className="inline-block p-4 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-300 mb-4">
-                  <div className="w-40 h-40 bg-white border border-slate-200 flex items-center justify-center text-slate-400 m-auto">
-                    [Static QR]
-                  </div>
-                </div>
-                <h3 className="font-bold text-slate-800 mb-2">Warung Bu Sri</h3>
-                <p className="text-sm text-slate-500 mb-6">Cetak QR ini dan tempel di meja kasir. Customer akan menginput nominal sendiri.</p>
-                <button className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition">
-                  Download Standee (PDF)
+              <div className="text-center py-6 animate-fade-in space-y-4">
+                <StaticMerchantQR merchantId="BSRI-091" merchantName="Warung Bu Sri" />
+                <p className="text-sm text-slate-500">Cetak QR ini dan tempel di meja kasir. Customer akan menginput nominal sendiri.</p>
+                <button 
+                  onClick={() => {
+                    // Trigger download of the static QR canvas
+                    const canvas = document.querySelector('#static-qr-canvas') as HTMLCanvasElement;
+                    if (canvas) {
+                      const url = canvas.toDataURL("image/png");
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `Qurate-Static-BSRI-091.png`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }
+                  }}
+                  className="bg-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-700 transition"
+                >
+                  Download Standee (PNG)
                 </button>
               </div>
             )}
