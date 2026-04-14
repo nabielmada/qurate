@@ -83,6 +83,12 @@ export class AiRouterService {
           }),
         });
         
+        if (!response.ok) {
+          const text = await response.text();
+          console.error(`Alchemy RPC HTTP Error [${chainName}]: ${response.status} - ${text.substring(0, 100)}`);
+          throw new Error(`RPC_HTTP_ERROR: ${response.status}`);
+        }
+
         const data = await response.json();
         const gasPriceWei = BigInt(data.result || '0');
         const gasPriceEth = Number(gasPriceWei) / 1e18;

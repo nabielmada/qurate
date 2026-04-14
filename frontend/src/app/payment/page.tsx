@@ -33,10 +33,17 @@ export default function PaymentFlow() {
   const [loadingRealData, setLoadingRealData] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [amount, setAmount] = useState<number>(25000);
-  const currency = 'IDR';
   const searchParams = useSearchParams();
   const merchantId = searchParams?.get('id') || 'm_nabiel_001';
+  const urlAmount = searchParams?.get('amount');
+  
+  const [amount, setAmount] = useState<number>(urlAmount ? Number(urlAmount) : 25000);
+  const isAmountLocked = !!urlAmount;
+  const currency = 'IDR';
+
+  const [aiGreeting, setAiGreeting] = useState<string>("Sapaan AI...");
+  const [lastPreferredChain, setLastPreferredChain] = useState<string | null>(null);
+  
   const hasRun = useRef(false);
 
   const currencySymbol = 'Rp';
@@ -62,6 +69,15 @@ export default function PaymentFlow() {
       }
     }
     fetchMerchant();
+
+    // AI Memory: Load last preference
+    const saved = localStorage.getItem('qurate_last_chain');
+    if (saved) {
+      setLastPreferredChain(saved);
+      setAiGreeting(`Halo! Saya ingat kamu lebih suka jaringan ${saved}. Saya akan memprioritaskan rute termurah di jaringan tersebut untuk kenyamananmu.`);
+    } else {
+      setAiGreeting("Halo! Saya adalah Qurate Agent. Saya akan mencarikan rute pembayaran paling efisien untukmu.");
+    }
   }, [merchantId]);
 
   const startAIEngine = async () => {
@@ -253,6 +269,11 @@ export default function PaymentFlow() {
 
       if (error) {
         console.error("Gagal simpan ke Supabase:", error);
+      } else {
+        // AI Memory: Save success preference
+        if (usedRoute?.chain) {
+          localStorage.setItem('qurate_last_chain', usedRoute.chain);
+        }
       }
 
       setStep('confirmed');
@@ -340,29 +361,52 @@ export default function PaymentFlow() {
                       type="number"
                       value={amount}
                       onChange={(e) => setAmount(Number(e.target.value))}
-                      className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-14 text-2xl font-bold text-slate-900 focus:border-blue-500 focus:bg-white focus:outline-none transition"
+                      readOnly={isAmountLocked}
+                      className={`w-full border-2 rounded-2xl p-4 pl-14 text-2xl font-black focus:outline-none transition ${
+                        isAmountLocked 
+                          ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white'
+                      }`}
                       placeholder="25000"
                       min={1000}
                     />
+                    {isAmountLocked && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-100 text-blue-600 px-2 py-1 rounded text-[8px] font-black uppercase tracking-widest border border-blue-200">Fixed</div>
+                    )}
                   </div>
+                  {isAmountLocked && (
+                    <p className="text-[9px] text-slate-500 mt-2 font-medium italic">Nominal dikunci sesuai permintaan merchant via QR.</p>
+                  )}
                 </div>
 
-                {/* Quick amount buttons */}
-                <div className="flex gap-2">
-                  {[10000, 25000, 50000, 100000].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setAmount(v)}
-                      className={`flex-1 py-2 text-xs font-bold rounded-xl border-2 transition ${
-                        amount === v 
-                          ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      {(v / 1000)}K
-                    </button>
-                  ))}
+                {/* AI GREETING / MEMORY BOX */}
+                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 relative overflow-hidden group">
+                   <div className="absolute right-0 top-0 opacity-[0.03] transform translate-x-1/4 -translate-y-1/4">
+                      <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13h-13L12 6.5z"/></svg>
+                   </div>
+                   <div className="flex gap-3">
+                      <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xs shadow-lg shadow-blue-200 flex-shrink-0">✨</div>
+                      <p className="text-[11px] text-blue-800 font-medium leading-relaxed italic">&ldquo;{aiGreeting}&rdquo;</p>
+                   </div>
                 </div>
+
+                {!isAmountLocked && (
+                  <div className="flex gap-2">
+                    {[10000, 25000, 50000, 100000].map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setAmount(v)}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl border-2 transition ${
+                          amount === v 
+                            ? 'bg-blue-50 border-blue-300 text-blue-700' 
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                        }`}
+                      >
+                        {(v / 1000)}K
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <button 
                   onClick={startAIEngine}
@@ -442,31 +486,31 @@ export default function PaymentFlow() {
                       {candidates.map((c, i) => (
                         <tr key={i} className={`transition-colors duration-300 ${i === 0 ? 'bg-blue-600/5' : 'hover:bg-slate-100/50'}`}>
                           <td className="px-4 py-3">
-                            <div className="font-bold text-slate-800">{c.token}</div>
+                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                              {c.token}
+                              {lastPreferredChain === c.chain && (
+                                <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-tighter border border-blue-200">Memory Bonus</span>
+                              )}
+                            </div>
                             <div className="text-[8px] text-slate-400 font-medium">{c.chain}</div>
                           </td>
-                          <td className="px-4 py-3 font-medium text-slate-500">
+                          <td className="px-4 py-3 font-bold text-slate-600">
                             Rp {c.gasEstimateIdr.toLocaleString('id-ID')}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
-                              <div className="w-16">
-                                <ScoreBar 
-                                  value={c.score} 
-                                  color={i === 0 ? 'bg-blue-600' : 'bg-slate-300'} 
-                                />
+                              <div className="w-12">
+                                <ScoreBar value={c.score} color={i === 0 ? 'bg-blue-600' : 'bg-slate-300'} />
                               </div>
-                              <span className={`text-[9px] font-bold ${i === 0 ? 'text-blue-600' : 'text-slate-400'}`}>
-                                {(c.score * 100).toFixed(0)}%
-                              </span>
+                              <span className={`font-black ${i === 0 ? 'text-blue-600' : 'text-slate-400'}`}>{(c.score * 100).toFixed(0)}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase inline-block ${
-                              i === 0 ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-200 text-slate-500'
-                            }`}>
-                              {i === 0 ? '✓ Dipilih' : `#${i + 1}`}
-                            </span>
+                            {i === 0 ? (
+                              <span className="bg-blue-600 text-white px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 italic">Winning Route</span>
+                            ) : (
+                              <span className="text-slate-300 font-bold italic">Eligible</span>
+                            )}
                           </td>
                         </tr>
                       ))}
