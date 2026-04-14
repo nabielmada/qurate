@@ -1,8 +1,8 @@
 const hre = require("hardhat");
 
 async function main() {
-  const contractAddress = "0xB8Be3D8a08fb0D0B3D13E269e537Bb0fFaeA67De";
-  const merchantId = "m_gacoan_001";
+  const contractAddress = "0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE";
+  const merchantId = "m_nabiel_001";
   const merchantWallet = "0xE7AA73E33a8C99E6842562B4A876534b2503c57C"; // User's own wallet as the merchant for demo
 
   console.log(`Registering merchant ${merchantId} to ${merchantWallet}...`);

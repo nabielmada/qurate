@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useWallet } from '@/context/WalletContext';
 import { ethers } from 'ethers';
 import { supabase } from '@/lib/supabase';
+import { useWriteContract } from 'wagmi';
+import { parseEther } from 'viem';
 
 type ChainInfo = {
   name: string;
@@ -58,7 +60,7 @@ export default function PaymentFlow() {
         const routeRes = await fetch(`http://127.0.0.1:3001/api/route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokens, amountIDR: 50000 })
+          body: JSON.stringify({ tokens, amountIDR: 2500 })
         });
         
         if (!routeRes.ok) {
@@ -110,8 +112,9 @@ export default function PaymentFlow() {
     if (step === 'analyzing' && address) {
        runAIEngine();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
+
+  const { writeContractAsync } = useWriteContract();
 
   const handleConfirm = async () => {
     try {
@@ -119,38 +122,52 @@ export default function PaymentFlow() {
       
       let finalHash = "";
       
-      if (!isGuest) {
-        setLogs(prev => [...prev, "🔐 Menunggu konfirmasi wallet..."]);
+      if (!isGuest && address) {
+        setLogs(prev => [...prev, "🔐 Menghubungkan ke Wallet..."]);
         
-        // INTEGRASI ON-CHAIN NYATA
-        const CONTRACT_ADDRESS = "0xB8Be3D8a08fb0D0B3D13E269e537Bb0fFaeA67De";
+        const CONTRACT_ADDRESS = "0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE" as `0x${string}`;
         const ABI = [
-          "function payDirect(string memory merchantId, address token, uint256 amount) external"
+          {
+            name: "payNative",
+            type: "function",
+            stateMutability: "payable",
+            inputs: [{ name: "merchantId", type: "string" }],
+            outputs: []
+          }
         ];
 
-        if (typeof window.ethereum !== 'undefined') {
-          const provider = new ethers.BrowserProvider(window.ethereum as any);
-          const signer = await provider.getSigner();
-          const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-
-          // Untuk demo ini, kita asumsikan membayar dengan native ETH atau token tertentu
-          // (Logika smart contract kita saat ini asumsikan ERC20, tapi kita simulasi transaksinya)
-          // Catatan: Di production, butuh approval token jika bukan Native ETH.
+        try {
+          const amountIdr = 2500;
+          const ethValue = (amountIdr / 16000 / 3000).toFixed(6);
           
-          setLogs(prev => [...prev, "🛠️ Menyiapkan payload transaksi on-chain..."]);
+          setLogs(prev => [...prev, "✍️ Silakan tanda tangani di MetaMask..."]);
           
-          // Simulasi pemanggilan (karena kita pakai Base Sepolia)
-          // Jika ingin panggil beneran:
-          // const tx = await contract.payDirect("m_gacoan_001", "0xTokenAddress", ethers.parseEther("0.0001"));
-          // await tx.wait();
-          // finalHash = tx.hash;
+          const hash = await writeContractAsync({
+            address: CONTRACT_ADDRESS,
+            abi: ABI,
+            functionName: 'payNative',
+            args: ["m_nabiel_001"],
+            value: parseEther(ethValue),
+            chainId: 84532 // Explicitly Base Sepolia
+          });
 
-          await sleep(2000); // Simulasi tunggu signature
-          finalHash = "0x" + Math.random().toString(16).slice(2, 42); 
-          setLogs(prev => [...prev, "✅ Transaksi dikonfirmasi di Base Sepolia!"]);
+          setLogs(prev => [...prev, "⏳ Menunggu konfirmasi jaringan..."]);
+          finalHash = hash;
+          setLogs(prev => [...prev, "✅ Transaksi dikirim ke Base Sepolia!"]);
+        } catch (e: any) {
+          console.error("Wagmi Error:", e);
+          setLogs(prev => [...prev, "❌ Pembayaran dibatalkan atau gagal."]);
+          return;
         }
       } else {
-        finalHash = "0x" + Math.random().toString(16).slice(2, 42);
+        if (isGuest) {
+          setLogs(prev => [...prev, "ℹ️ Menjalankan simulasi (Mode Tamu)..."]);
+        } else {
+          setLogs(prev => [...prev, "⚠️ Dompet belum terhubung."]);
+          return;
+        }
+        await sleep(1500);
+        finalHash = "0x" + Math.random().toString(16).slice(2, 42); 
       }
 
       setTxHash(finalHash);
@@ -158,9 +175,9 @@ export default function PaymentFlow() {
       // SAVE TO SUPABASE
       const { error } = await supabase.from('transactions').insert({
         id: `tx_${Date.now()}`,
-        merchant_id: 'm_gacoan_001',
+        merchant_id: 'm_nabiel_001',
         user_address: address,
-        amount_idr: 50000,
+        amount_idr: 2500,
         amount_token: bestRoute?.amountToken || 0,
         token_symbol: bestRoute?.token || 'ETH',
         chain: bestRoute?.chain || 'Base',
@@ -253,7 +270,7 @@ export default function PaymentFlow() {
             <div className="flex flex-col flex-1 animate-fade-in">
               <div className="mb-6 flex justify-between items-end">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight text-center">Evaluasi Jaringan (Real)</h2>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight text-center">Warung Nabiel</h2>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Berdasarkan Alchemy & Route scoring</p>
                 </div>
                 <div className="bg-blue-50 px-2 py-1 rounded text-[8px] font-black text-blue-600 uppercase border border-blue-100">Live Snapshot</div>
@@ -300,7 +317,7 @@ export default function PaymentFlow() {
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total (IDR)</p>
-                    <p className="text-xl font-bold">≈ Rp {(50000 + bestRoute.gasEstimateIdr).toLocaleString('id-ID')}</p>
+                    <h2 className="text-3xl font-bold mb-1">Rp 2.500</h2>
                   </div>
                 </div>
               </div>
@@ -336,7 +353,7 @@ export default function PaymentFlow() {
                 <div className="bg-slate-50/50 rounded-[2rem] p-6 border border-slate-100">
                   <div className="grid grid-cols-2 gap-y-4 text-xs font-medium">
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Nominal</div>
-                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">Rp 50.000</div>
+                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">Rp 2.500</div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Sumber Dana</div>
                     <div className="text-right font-bold text-slate-900 leading-tight">
@@ -352,7 +369,7 @@ export default function PaymentFlow() {
                 <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600"></div>
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-[9px] font-black uppercase text-blue-600 tracking-widest">Penjelasan Agent (Gemini 2.5)</h3>
+                    <h3 className="text-[9px] font-black uppercase text-blue-600 tracking-widest">Penjelasan Agent (AI Powered)</h3>
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                   </div>
                   <p className="text-xs text-slate-700 font-bold leading-[1.7] italic">

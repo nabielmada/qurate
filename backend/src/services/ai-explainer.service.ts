@@ -26,7 +26,7 @@ export class AiExplainerService {
 
     try {
       const prompt = `
-        Konteks: Aplikasi Pembayaran Web3 bernama PayAI.
+        Konteks: Aplikasi Pembayaran Web3 bernama Qurate AI.
         Tugas: Jelaskan mengapa AI memilih rute pembayaran ini kepada pengguna awam.
         
         Data Transaksi:
@@ -43,14 +43,14 @@ export class AiExplainerService {
         5. Jangan beri salam pembuka.
       `;
 
-      // Menggunakan model gemini-2.5-flash sesuai instruksi user
+      // Menggunakan model gemini-1.5-flash untuk stabilitas lebih baik
       const response = await this.client.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 
       let text = response.text || '';
-      
+
       // Bersihkan jika ada tanda kutip
       text = text.trim().replace(/^["']|["']$/g, '');
 

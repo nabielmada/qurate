@@ -49,19 +49,33 @@ contract PayAIRouter {
     }
 
     /**
-     * @notice Lakukan pembayaran token secara langsung ke merchant
+     * @notice Lakukan pembayaran token secara langsung ke merchant (ERC20)
      * @param merchantId ID merchant penerima
-     * @param token Alamat token ERC20 (contoh kontrak USDC di Base Sepolia)
-     * @param amount Jumlah pembayaran (dalam unit dasar token)
+     * @param token Alamat token ERC20
+     * @param amount Jumlah pembayaran
      */
     function payDirect(string memory merchantId, address token, uint256 amount) external {
         address merchantWallet = merchants[merchantId];
         require(merchantWallet != address(0), "Merchant tidak ditemukan");
         require(amount > 0, "Nominal harus > 0");
 
-        // Kirim token dari dompet user (atau AI agent wallet) langsung ke merchant terminal
         IERC20(token).safeTransferFrom(msg.sender, merchantWallet, amount);
-
         emit PaymentReceived(merchantId, merchantWallet, msg.sender, token, amount);
+    }
+
+    /**
+     * @notice Lakukan pembayaran Native ETH secara langsung ke merchant
+     * @param merchantId ID merchant penerima
+     */
+    function payNative(string memory merchantId) external payable {
+        address merchantWallet = merchants[merchantId];
+        require(merchantWallet != address(0), "Merchant tidak ditemukan");
+        require(msg.value > 0, "Nominal harus > 0");
+
+        // Kirim Native ETH langsung ke terminal merchant
+        (bool success, ) = merchantWallet.call{value: msg.value}("");
+        require(success, "Pengiriman ETH gagal");
+
+        emit PaymentReceived(merchantId, merchantWallet, msg.sender, address(0), msg.value);
     }
 }
