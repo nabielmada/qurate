@@ -1,6 +1,12 @@
+"use client";
+
 import Link from 'next/link';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useWallet } from '@/context/WalletContext';
 
 export default function Home() {
+  const { setGuestMode, isConnected } = useWallet();
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-100">
       {/* Navigation */}
@@ -16,6 +22,9 @@ export default function Home() {
             <a href="#vision" className="hover:text-blue-600 transition-colors">Visi</a>
             <a href="#pillars" className="hover:text-blue-600 transition-colors">Pilar</a>
             <a href="#about" className="hover:text-blue-600 transition-colors">Tentang</a>
+          </div>
+          <div>
+            <ConnectButton />
           </div>
         </div>
       </nav>
@@ -35,16 +44,34 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 animate-slide-up animation-delay-200">
-            <Link href="/user">
-              <button className="px-8 py-4 bg-slate-900 text-white font-bold text-base rounded-xl hover:bg-slate-800 transition shadow-lg shadow-slate-200 transform hover:-translate-y-0.5">
-                Connect to Pay
-              </button>
-            </Link>
-            <Link href="/merchant">
-              <button className="px-8 py-4 bg-white text-slate-900 border border-slate-200 font-bold text-base rounded-xl hover:border-slate-300 transition transform hover:-translate-y-0.5">
-                Start Merchant
-              </button>
-            </Link>
+            {isConnected ? (
+              <Link href="/user">
+                <button className="px-8 py-4 bg-blue-600 text-white font-bold text-base rounded-2xl hover:bg-blue-700 transition shadow-xl shadow-blue-200 transform hover:-translate-y-0.5">
+                  Masuk ke Dashboard
+                </button>
+              </Link>
+            ) : (
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                <ConnectButton.Custom>
+                  {({ openConnectModal }) => (
+                    <button 
+                      onClick={openConnectModal}
+                      className="px-8 py-4 bg-slate-900 text-white font-bold text-base rounded-2xl hover:bg-slate-800 transition shadow-xl shadow-slate-200 transform hover:-translate-y-0.5"
+                    >
+                      Hubungkan Wallet
+                    </button>
+                  )}
+                </ConnectButton.Custom>
+                
+                <button 
+                  onClick={setGuestMode}
+                  className="px-8 py-4 bg-white text-slate-900 border border-slate-200 font-bold text-base rounded-2xl hover:border-slate-300 transition transform hover:-translate-y-0.5 flex items-center gap-2"
+                >
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                  Coba Versi Guest (Demo)
+                </button>
+              </div>
+            )}
           </div>
         </section>
 

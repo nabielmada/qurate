@@ -11,8 +11,8 @@ const CHAIN_CONFIG = {
   Ethereum: 'eth-mainnet',
   Polygon: 'polygon-mainnet',
   Base: 'base-mainnet',
+  'Base Sepolia': 'base-sepolia', // Tambahkan support Testnet untuk Demo
   Arbitrum: 'arb-mainnet',
-  BSC: 'bnb-mainnet',
 };
 
 @Injectable()
@@ -37,19 +37,45 @@ export class WalletScannerService {
     const allTokens: TokenBalance[] = [];
     const chains = Object.keys(CHAIN_CONFIG);
 
-    // 2. Fetch ke semua chain: Ethereum, Polygon, Base, BSC, Arbitrum secara paralel
+    // 2. Fetch ke semua chain secara paralel
     await Promise.all(
       chains.map(async (chain) => {
         try {
           const network = CHAIN_CONFIG[chain as keyof typeof CHAIN_CONFIG];
           const url = `https://${network}.g.alchemy.com/v2/${this.apiKey}`;
 
-          // 4. Pakai endpoint Alchemy: alchemy_getTokenBalances
+          // --- A. FETCH NATIVE ETH BALANCE ---
+          const ethBalanceRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [walletAddress, 'latest'],
+              id: 1,
+            }),
+          });
+          
+          if (ethBalanceRes.ok) {
+            const ethData = await ethBalanceRes.json();
+            const rawBalance = BigInt(ethData.result || '0').toString();
+            const balance = Number(rawBalance) / 1e18;
+
+            if (balance > 0) {
+              const symbol = chain.includes('Polygon') ? 'POL' : 'ETH';
+              allTokens.push({
+                symbol,
+                chain,
+                balance,
+                usdValue: balance * 3000 // Treat Testnet ETH as Real ETH price for demo simulation
+              });
+            }
+          }
+
+          // --- B. FETCH ERC20 TOKENS ---
           const response = await fetch(url, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               jsonrpc: '2.0',
               method: 'alchemy_getTokenBalances',
@@ -96,8 +122,8 @@ export class WalletScannerService {
                 if (symbol === 'USDC' || symbol === 'USDT') usdValue = balance;
                 else if (symbol === 'ETH' || symbol === 'WETH') usdValue = balance * 3000;
                 else if (symbol === 'BNB') usdValue = balance * 600;
-                else if (symbol === 'MATIC' || symbol === 'POL') usdValue = balance * 0.7;
-                else usdValue = balance * 0.5; // fallback
+                else if (symbol === 'POL') usdValue = balance * 0.7;
+                else usdValue = balance * (chain.toLowerCase().includes('sepolia') ? 100 : 0.5); // Fallback testnet vs mainnet
 
                 allTokens.push({
                   symbol,
@@ -121,7 +147,8 @@ export class WalletScannerService {
 
     let filteredTokens = allTokens.filter(t => {
       const isSpam = spamKeywords.some(key => t.symbol.toUpperCase().includes(key));
-      return !isSpam && t.usdValue > 0.1; // Hanya ambil yang punya value > $0.1
+      const isTestnet = t.chain.toLowerCase().includes('sepolia');
+      return !isSpam && (isTestnet ? t.balance > 0 : t.usdValue > 0.1);
     });
 
     // Urutkan berdasarkan nilai USD tertinggi
@@ -129,16 +156,6 @@ export class WalletScannerService {
 
     // Ambil Top 8 saja agar UI tetap bersih
     const topTokens = filteredTokens.slice(0, 8);
-
-    // 6. Fallback untuk Demo Hackathon jika saldo kosong
-    if (topTokens.length === 0) {
-      console.log('Menggunakan data demo karena saldo tidak ditemukan.');
-      return [
-        { symbol: 'USDC', chain: 'Polygon', balance: 1250.50, usdValue: 1250.50 },
-        { symbol: 'ETH', chain: 'Ethereum', balance: 0.45, usdValue: 1350.00 },
-        { symbol: 'USDT', chain: 'Arbitrum', balance: 500.00, usdValue: 500.00 }
-      ];
-    }
 
     return topTokens;
   }

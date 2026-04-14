@@ -19,8 +19,9 @@ export class AppController {
   }
 
   @Post('route')
-  async findRoute(@Body() body: { tokens: TokenBalance[], amountIDR: number }): Promise<RouteData | null> {
-    return this.aiRouter.findOptimalRoute(body.tokens, body.amountIDR);
+  async findRoute(@Body() body: { tokens: TokenBalance[], amountIDR: number }): Promise<{ data: RouteData | null }> {
+    const route = await this.aiRouter.findOptimalRoute(body.tokens, body.amountIDR);
+    return { data: route };
   }
 
   @Post('explain')

@@ -14,6 +14,7 @@ export class AiRouterService {
   // Estimasi standar kecepatan konfirmasi block (dalam detik)
   private readonly SPEEDS = {
     'Base': 2,
+    'Base Sepolia': 2,
     'Polygon': 2,
     'BSC': 3,
     'Arbitrum': 2,
@@ -27,11 +28,12 @@ export class AiRouterService {
   async getGasPrices(): Promise<Record<string, number>> {
     // Implementasi nyata: fetch ke basescan.org/api, polygonscan.com/api, dll.
     return {
-      'Base': 50,      // ~ Rp 50
-      'Polygon': 150,  // ~ Rp 150
-      'Arbitrum': 80,  // ~ Rp 80
-      'BSC': 300,      // ~ Rp 300
-      'Ethereum': 45000 // ~ Rp 45000
+      'Base': 50,
+      'Base Sepolia': 50,
+      'Polygon': 150,
+      'Arbitrum': 80,
+      'BSC': 300,
+      'Ethereum': 45000
     };
   }
 
@@ -61,9 +63,12 @@ export class AiRouterService {
    * 3. Fungsi findOptimalRoute(walletTokens, amountIDR)
    */
   async findOptimalRoute(walletTokens: TokenBalance[], amountIDR: number): Promise<RouteData | null> {
+    // KONVERSI IDR KE USD (Asumsi Rp 16.000)
+    const amountUSD = amountIDR / 16000;
+    
     // Filter token yang balance cukup dengan buffer 5%
-    const minRequired = amountIDR * 1.05; 
-    const eligibleTokens = walletTokens.filter(t => t.usdValue >= minRequired);
+    const minRequiredUSD = amountUSD * 1.05; 
+    const eligibleTokens = walletTokens.filter(t => t.usdValue >= minRequiredUSD);
 
     if (eligibleTokens.length === 0) {
       return null;
