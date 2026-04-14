@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useRouter } from 'next/navigation';
 
-export const DUMMY_ADDRESS = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"; // Vitalik
+export const DUMMY_ADDRESS = "0xGUEST";
 
 interface WalletContextType {
   address: string | undefined;

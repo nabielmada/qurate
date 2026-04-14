@@ -1,24 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { RouteData } from './ai-router.service';
 import { GoogleGenAI } from '@google/genai';
+import { CurrencyService } from './currency.service';
 
 @Injectable()
 export class AiExplainerService {
   private readonly client: any = null;
 
-  constructor() {
+  constructor(private readonly currencyService: CurrencyService) {
     const apiKey = process.env.GEMINI_API_KEY || '';
     if (apiKey) {
-      // Menggunakan SDK terbaru @google/genai
       this.client = new GoogleGenAI({ apiKey });
     }
   }
 
   /**
-   * Panggil Google Gemini API v2.5
+   * Panggil Google Gemini API
    * Generate human-readable reasoning
    */
-  async explainDecision(routeData: RouteData, merchantName: string, amountIDR: number): Promise<string> {
+  async explainDecision(routeData: RouteData, merchantName: string, amount: number, currency: string = 'IDR'): Promise<string> {
+    const symbol = this.currencyService.getSymbol(currency);
+    
     if (!this.client) {
       console.warn('GEMINI_API_KEY tidak dikonfigurasi. Menggunakan fallback lokal.');
       return `Saya merekomendasikan menggunakan ${routeData.token} di jaringan ${routeData.chain}. Biayanya sangat murah dan prosesnya cepat!`;
@@ -30,9 +32,9 @@ export class AiExplainerService {
         Tugas: Jelaskan mengapa AI memilih rute pembayaran ini kepada pengguna awam.
         
         Data Transaksi:
-        - Pelanggan membayar Rp ${amountIDR.toLocaleString('id-ID')} ke merchant "${merchantName}".
+        - Pelanggan membayar ${symbol} ${amount.toLocaleString()} ke merchant "${merchantName}".
         - Strategi terpilih: Token ${routeData.token} di network ${routeData.chain}.
-        - Estimasi biaya admin/gas: Rp ${routeData.gasEstimateIdr.toLocaleString('id-ID')}.
+        - Estimasi biaya admin/gas (dalam IDR): Rp ${routeData.gasEstimateIdr.toLocaleString('id-ID')}.
         - Skor efisiensi AI: ${(routeData.score * 100).toFixed(0)}%.
         
         Instruksi:
@@ -50,13 +52,11 @@ export class AiExplainerService {
       });
 
       let text = response.text || '';
-
-      // Bersihkan jika ada tanda kutip
       text = text.trim().replace(/^["']|["']$/g, '');
 
       return text;
     } catch (e) {
-      console.error('Kendala saat menghubungi Gemini 2.5 API:', e);
+      console.error('Kendala saat menghubungi Gemini API:', e);
       return `Opsi pembayaran terbaik saat ini adalah menggunakan ${routeData.token} via jaringan ${routeData.chain}.`;
     }
   }

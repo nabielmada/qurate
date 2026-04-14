@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { supabase } from '@/lib/supabase';
 import { useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
+import { useSearchParams } from 'next/navigation';
 
 type ChainInfo = {
   name: string;
@@ -21,10 +22,19 @@ export default function PaymentFlow() {
   const [step, setStep] = useState<'analyzing' | 'decision' | 'confirmed'>('analyzing');
   const [logs, setLogs] = useState<string[]>([]);
   const [bestRoute, setBestRoute] = useState<any>(null);
+  const [gasPrices, setGasPrices] = useState<Record<string, number>>({});
   const [explanation, setExplanation] = useState<string>("");
+  const [merchantData, setMerchantData] = useState<any>(null);
   const [loadingRealData, setLoadingRealData] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const amount = 2500; // Fixed amount as requested
+  const currency = 'IDR';
+  const searchParams = useSearchParams();
+  const merchantId = searchParams?.get('id') || 'm_nabiel_001';
   const hasRun = useRef(false);
+
+  const currencySymbol = 'Rp';
 
   // Helper untuk menambahkan log dengan smooth
   const addLog = (msg: string) => {
@@ -41,9 +51,18 @@ export default function PaymentFlow() {
       try {
         setLoadingRealData(true);
         
-        // Step 1: Init
-        addLog("🔍 Memindai QR... Merchant: Mie Gacoan");
+        // Step 0: Fetch Merchant
+        addLog(`🔍 Mencari merchant ID: ${merchantId}...`);
+        const merchantRes = await fetch(`http://127.0.0.1:3001/api/merchants/${merchantId}`);
+        const merchantResult = await merchantRes.json();
+        if (merchantResult.success) {
+          setMerchantData(merchantResult.merchant);
+          addLog(`🏢 Merchant ditemukan: ${merchantResult.merchant.name}`);
+        } else {
+          addLog("⚠️ Merchant tidak ditemukan di database.");
+        }
         await sleep(600);
+
         addLog("🛡️ Menghubungkan ke secure vault wallet Anda...");
         await sleep(800);
         
@@ -55,12 +74,19 @@ export default function PaymentFlow() {
         addLog(`✅ Scan selesai. Ditemukan ${tokens.length} aset aktif di 5 jaringan.`);
         await sleep(700);
 
-        // Step 3: Routing
+        // Step 3: Gas Prices Fetch
+        addLog("📡 Mengambil data gas price real-time dari Alchemy...");
+        const gasRes = await fetch(`http://127.0.0.1:3001/api/gas-prices`);
+        const gasData = await gasRes.json();
+        setGasPrices(gasData);
+        await sleep(600);
+
+        // Step 4: Routing
         addLog("📊 Menjalankan skor efisiensi AI dan analisa rute...");
         const routeRes = await fetch(`http://127.0.0.1:3001/api/route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tokens, amountIDR: 2500 })
+          body: JSON.stringify({ tokens, amount, currency })
         });
         
         if (!routeRes.ok) {
@@ -79,13 +105,18 @@ export default function PaymentFlow() {
         addLog(`🤖 Keputusan Agent: Menggunakan ${routeData.token} di network ${routeData.chain}.`);
         await sleep(700);
 
-        // Step 4: Explanation
-        addLog("✨ Gemini 2.5 Flash sedang menyusun narasi keputusan...");
+        // Step 5: Explanation
+        addLog("✨ Gemini 1.5 Flash sedang menyusun narasi keputusan...");
         if (routeData) {
           const explainRes = await fetch(`http://127.0.0.1:3001/api/explain`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ routeData, merchantName: "Mie Gacoan", amountIDR: 50000 })
+            body: JSON.stringify({ 
+              routeData, 
+              merchantName: merchantData?.name || "Merchant", 
+              amount, 
+              currency 
+            })
           });
           const explainData = await explainRes.json();
           setExplanation(explainData.explanation);
@@ -118,6 +149,7 @@ export default function PaymentFlow() {
 
   const handleConfirm = async () => {
     try {
+      setIsProcessing(true);
       setLogs(prev => [...prev, "🚀 Memproses pembayaran..."]);
       
       let finalHash = "";
@@ -137,8 +169,8 @@ export default function PaymentFlow() {
         ];
 
         try {
-          const amountIdr = 2500;
-          const ethValue = (amountIdr / 16000 / 3000).toFixed(6);
+          // Ambil amountToken dari backend yang sudah dikalkulasi real-time
+          const amountTokenStr = bestRoute?.amountToken?.toString() || "0";
           
           setLogs(prev => [...prev, "✍️ Silakan tanda tangani di MetaMask..."]);
           
@@ -146,8 +178,8 @@ export default function PaymentFlow() {
             address: CONTRACT_ADDRESS,
             abi: ABI,
             functionName: 'payNative',
-            args: ["m_nabiel_001"],
-            value: parseEther(ethValue),
+            args: [merchantId],
+            value: parseEther(amountTokenStr),
             chainId: 84532 // Explicitly Base Sepolia
           });
 
@@ -175,9 +207,9 @@ export default function PaymentFlow() {
       // SAVE TO SUPABASE
       const { error } = await supabase.from('transactions').insert({
         id: `tx_${Date.now()}`,
-        merchant_id: 'm_nabiel_001',
+        merchant_id: merchantId,
         user_address: address,
-        amount_idr: 2500,
+        amount_idr: currency === 'IDR' ? amount : amount * 16000, // Legacy support for DB
         amount_token: bestRoute?.amountToken || 0,
         token_symbol: bestRoute?.token || 'ETH',
         chain: bestRoute?.chain || 'Base',
@@ -194,16 +226,26 @@ export default function PaymentFlow() {
     } catch (err) {
       console.error("Gagal eksekusi transaksi:", err);
       setLogs(prev => [...prev, "❌ Transaksi dibatalkan atau gagal."]);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const CHAINS: ChainInfo[] = [
-    { name: 'Ethereum', fee: 'Rp 41.200', time: '12 dtk', status: bestRoute?.chain === 'Ethereum' ? '✓ Dipilih' : 'tersedia', feeRaw: 41200 },
-    { name: 'BSC', fee: 'Rp 300', time: '3 dtk', status: bestRoute?.chain === 'BSC' ? '✓ Dipilih' : 'tersedia', feeRaw: 300 },
-    { name: 'Polygon', fee: 'Rp 150', time: '2 dtk', status: bestRoute?.chain === 'Polygon' ? '✓ Dipilih' : 'tersedia', feeRaw: 150 },
-    { name: 'Base Sepolia', fee: 'Rp 50', time: '2 dtk', status: bestRoute?.chain === 'Base Sepolia' ? '✓ Dipilih' : 'tersedia', feeRaw: 50 },
-    { name: 'Arbitrum', fee: 'Rp 80', time: '2 dtk', status: bestRoute?.chain === 'Arbitrum' ? '✓ Dipilih' : 'tersedia', feeRaw: 80 },
-  ];
+  const STATIC_CHAINS = ['Ethereum', 'Polygon', 'Base', 'Arbitrum', 'Base Sepolia', 'BSC'];
+  
+  const CHAINS: ChainInfo[] = STATIC_CHAINS.map(name => {
+    const feeRaw = gasPrices[name] || 0;
+    // Handle matching for both mainnet and testnet names if they are slightly different
+    const isSelected = bestRoute?.chain === name;
+    
+    return {
+      name,
+      fee: feeRaw > 0 ? `Rp ${feeRaw.toLocaleString('id-ID')}` : '---',
+      time: (name === 'Ethereum') ? '12 dtk' : '2 dtk',
+      status: isSelected ? '✓ Dipilih' : 'tersedia',
+      feeRaw
+    };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4 md:p-10 flex flex-col items-center justify-center relative overflow-hidden">
@@ -232,6 +274,7 @@ export default function PaymentFlow() {
 
         {/* MAIN PANEL */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-6 md:p-10 border border-white flex flex-col min-h-[480px]">
+          
 
           {step === 'analyzing' && (
             <div className="flex flex-col flex-1 animate-fade-in">
@@ -270,7 +313,7 @@ export default function PaymentFlow() {
             <div className="flex flex-col flex-1 animate-fade-in">
               <div className="mb-6 flex justify-between items-end">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 tracking-tight text-center">Warung Nabiel</h2>
+                  <h2 className="text-xl font-bold text-slate-900 tracking-tight text-center">{merchantData?.name || "Merchant"}</h2>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Berdasarkan Alchemy & Route scoring</p>
                 </div>
                 <div className="bg-blue-50 px-2 py-1 rounded text-[8px] font-black text-blue-600 uppercase border border-blue-100">Live Snapshot</div>
@@ -317,7 +360,7 @@ export default function PaymentFlow() {
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total (IDR)</p>
-                    <h2 className="text-3xl font-bold mb-1">Rp 2.500</h2>
+                    <h2 className="text-3xl font-bold mb-1">{currencySymbol} {amount.toLocaleString()}</h2>
                   </div>
                 </div>
               </div>
@@ -330,9 +373,24 @@ export default function PaymentFlow() {
 
               <button
                 onClick={handleConfirm}
-                className="w-full bg-blue-600 text-white font-bold py-4 rounded-3xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 transform active:scale-95 text-sm"
+                disabled={isProcessing}
+                className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl transform active:scale-95 text-sm flex items-center justify-center gap-3 ${
+                  isProcessing 
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+                }`}
               >
-                Konfirmasi Pembayaran
+                {isProcessing ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Memproses...
+                  </>
+                ) : (
+                  'Konfirmasi Pembayaran'
+                )}
               </button>
             </div>
           )}
@@ -353,7 +411,7 @@ export default function PaymentFlow() {
                 <div className="bg-slate-50/50 rounded-[2rem] p-6 border border-slate-100">
                   <div className="grid grid-cols-2 gap-y-4 text-xs font-medium">
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Nominal</div>
-                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">Rp 2.500</div>
+                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">{currencySymbol} {amount.toLocaleString()}</div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Sumber Dana</div>
                     <div className="text-right font-bold text-slate-900 leading-tight">
@@ -361,7 +419,7 @@ export default function PaymentFlow() {
                        <div className="text-[9px] text-blue-600 uppercase">{bestRoute?.chain}</div>
                     </div>
 
-                    <div className="text-slate-400 font-bold uppercase text-[9px]">Biaya Gas</div>
+                    <div className="text-slate-400 font-bold uppercase text-[9px]">Biaya Gas (Est)</div>
                     <div className="text-right font-bold text-emerald-600">Rp {bestRoute?.gasEstimateIdr.toLocaleString('id-ID')}</div>
                   </div>
                 </div>

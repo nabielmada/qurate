@@ -1,16 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { TokenBalance } from './wallet-scanner.service';
+import { CurrencyService } from './currency.service';
+import { CHAIN_CONFIG } from '../config/chains';
 
 export interface RouteData {
   token: string;
   chain: string;
   gasEstimateIdr: number;
+  amountToken: number;
   score: number;
   reasoning: string;
 }
 
 @Injectable()
 export class AiRouterService {
+  private readonly alchemyKey: string;
+  private readonly GAS_LIMIT = 100_000;
+
+  constructor(private readonly currencyService: CurrencyService) {
+    this.alchemyKey = process.env.ALCHEMY_API_KEY || '';
+  }
+
   // Estimasi standar kecepatan konfirmasi block (dalam detik)
   private readonly SPEEDS = {
     'Base': 2,
@@ -23,18 +33,61 @@ export class AiRouterService {
 
   /**
    * 1. Fungsi getGasPrices()
-   * Fetch gas price real-time (Untuk MVP Hackathon menggunakan baseline mock karena rate-limit API gratis)
+   * Fetch gas price real-time from Alchemy RPC
    */
   async getGasPrices(): Promise<Record<string, number>> {
-    // Implementasi nyata: fetch ke basescan.org/api, polygonscan.com/api, dll.
-    return {
-      'Base': 50,
-      'Base Sepolia': 50,
-      'Polygon': 150,
-      'Arbitrum': 80,
-      'BSC': 300,
-      'Ethereum': 45000
-    };
+    const chains = Object.keys(CHAIN_CONFIG);
+    const coingeckoIds = Array.from(new Set(chains.map(c => CHAIN_CONFIG[c].coingeckoId)));
+    
+    // Fetch token prices & exchange rates
+    const [tokenPrices, idrRates] = await Promise.all([
+      this.currencyService.getTokenPrices(coingeckoIds),
+      this.currencyService.getLatestRates()
+    ]);
+    const idrRate = idrRates['IDR'] || 16000;
+
+    const results: Record<string, number> = {};
+
+    // Fetch gas prices from Alchemy in parallel
+    await Promise.all(chains.map(async (chainName) => {
+      try {
+        const config = CHAIN_CONFIG[chainName];
+        const url = `https://${config.network}.g.alchemy.com/v2/${this.alchemyKey}`;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'eth_gasPrice',
+            params: [],
+          }),
+        });
+        
+        const data = await response.json();
+        const gasPriceWei = BigInt(data.result || '0');
+        const gasPriceEth = Number(gasPriceWei) / 1e18;
+        
+        // Fee = GasPrice * GasLimit
+        const feeEth = gasPriceEth * this.GAS_LIMIT;
+        
+        // Convert to IDR: Eth * TokenPrice(USD) * IDR_Rate
+        const tokenPriceUsd = tokenPrices[config.coingeckoId] || 0;
+        const feeIdr = feeEth * tokenPriceUsd * idrRate;
+        
+        // Tambahkan buffer 20% untuk safety di UI
+        results[chainName] = Math.round(feeIdr * 1.2);
+      } catch (error) {
+        console.error(`Error fetching gas price for ${chainName}:`, error);
+        results[chainName] = chainName === 'Ethereum' ? 50000 : 500; // Realistic defaults
+      }
+    }));
+
+    // Support BSC as mock because Alchemy doesn't support it for free
+    if (!results['BSC']) results['BSC'] = 300;
+
+    return results;
   }
 
   /**
@@ -60,11 +113,11 @@ export class AiRouterService {
   }
 
   /**
-   * 3. Fungsi findOptimalRoute(walletTokens, amountIDR)
+   * 3. Fungsi findOptimalRoute(walletTokens, amount, currency)
    */
-  async findOptimalRoute(walletTokens: TokenBalance[], amountIDR: number): Promise<RouteData | null> {
-    // KONVERSI IDR KE USD (Asumsi Rp 16.000)
-    const amountUSD = amountIDR / 16000;
+  async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'IDR'): Promise<RouteData | null> {
+    // KONVERSI MATA UANG KE USD
+    const amountUSD = await this.currencyService.convertToUSD(amount, currency);
     
     // Filter token yang balance cukup dengan buffer 5%
     const minRequiredUSD = amountUSD * 1.05; 
@@ -75,6 +128,12 @@ export class AiRouterService {
     }
 
     const gasPrices = await this.getGasPrices();
+    const idrRates = await this.currencyService.getLatestRates();
+    const idrRate = idrRates['IDR'] || 16000;
+    
+    // Fetch token prices for all possibly best tokens
+    const coingeckoIds = Array.from(new Set(eligibleTokens.map(t => CHAIN_CONFIG[t.chain].coingeckoId)));
+    const tokenPricesUsd = await this.currencyService.getTokenPrices(coingeckoIds);
     
     let bestRoute: RouteData | null = null;
     let highestScore = -1;
@@ -83,6 +142,12 @@ export class AiRouterService {
       const gPrice = gasPrices[token.chain] || 50000;
       const speed = this.SPEEDS[token.chain as keyof typeof this.SPEEDS] || 15;
       
+      const config = CHAIN_CONFIG[token.chain];
+      const tokenPriceUsd = tokenPricesUsd[config.coingeckoId] || 3500;
+      
+      // Hitung amountToken: (IDR / IDR_per_USD) / USD_per_Token
+      const amountToken = (amount / idrRate) / tokenPriceUsd;
+
       const score = this.calculateScore(token.symbol, token.chain, gPrice, speed);
       
       if (score > highestScore) {
@@ -91,6 +156,7 @@ export class AiRouterService {
           token: token.symbol,
           chain: token.chain,
           gasEstimateIdr: gPrice,
+          amountToken: Number(amountToken.toFixed(8)), // Presisi 8 desimal untuk crypto
           score: score,
           reasoning: `Skor: ${score.toFixed(2)}. ${token.symbol} / ${token.chain} dipilih karena gas fee rendah dan konversi stabil.`
         };

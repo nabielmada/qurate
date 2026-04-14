@@ -1,4 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { CurrencyService } from './currency.service';
+import { CHAIN_CONFIG } from '../config/chains';
 
 export interface TokenBalance {
   symbol: string;
@@ -7,42 +9,48 @@ export interface TokenBalance {
   usdValue: number;
 }
 
-const CHAIN_CONFIG = {
-  Ethereum: 'eth-mainnet',
-  Polygon: 'polygon-mainnet',
-  Base: 'base-mainnet',
-  'Base Sepolia': 'base-sepolia', // Tambahkan support Testnet untuk Demo
-  Arbitrum: 'arb-mainnet',
-};
-
 @Injectable()
 export class WalletScannerService {
   private readonly apiKey: string;
 
-  constructor() {
+  constructor(private readonly currencyService: CurrencyService) {
     this.apiKey = process.env.ALCHEMY_API_KEY || '';
   }
 
   async scanWallet(walletAddress: string): Promise<TokenBalance[]> {
-    // 1. Terima wallet address & error handling
+    // 1. Khusus untuk Guest Mode (Demo)
+    if (walletAddress === '0xGUEST') {
+      return [
+        { symbol: 'ETH', chain: 'Ethereum', balance: 0.1245, usdValue: 435.75 },
+        { symbol: 'POL', chain: 'Polygon', balance: 850.00, usdValue: 595.00 },
+        { symbol: 'USDC', chain: 'Base', balance: 250.00, usdValue: 250.00 },
+        { symbol: 'ETH', chain: 'Base Sepolia', balance: 0.045, usdValue: 157.50 },
+        { symbol: 'ARB', chain: 'Arbitrum', balance: 120.50, usdValue: 120.50 },
+      ];
+    }
+
+    // 2. Terima wallet address & error handling
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
       throw new HttpException('Format wallet address tidak valid', HttpStatus.BAD_REQUEST);
     }
 
     if (!this.apiKey) {
       console.warn('ALCHEMY_API_KEY belum dikonfigurasi di .env!');
-      // Untuk hackathon MVP, kita tidak langsung melempar error agar app tidak mati, tapi beri peringatan.
     }
 
     const allTokens: TokenBalance[] = [];
     const chains = Object.keys(CHAIN_CONFIG);
+    const coingeckoIds = Array.from(new Set(chains.map(c => CHAIN_CONFIG[c].coingeckoId)));
+    
+    // Fetch real-time prices
+    const tokenPrices = await this.currencyService.getTokenPrices(coingeckoIds);
 
     // 2. Fetch ke semua chain secara paralel
     await Promise.all(
       chains.map(async (chain) => {
         try {
-          const network = CHAIN_CONFIG[chain as keyof typeof CHAIN_CONFIG];
-          const url = `https://${network}.g.alchemy.com/v2/${this.apiKey}`;
+          const config = CHAIN_CONFIG[chain];
+          const url = `https://${config.network}.g.alchemy.com/v2/${this.apiKey}`;
 
           // --- A. FETCH NATIVE ETH BALANCE ---
           const ethBalanceRes = await fetch(url, {
@@ -62,12 +70,13 @@ export class WalletScannerService {
             const balance = Number(rawBalance) / 1e18;
 
             if (balance > 0) {
-              const symbol = chain.includes('Polygon') ? 'POL' : 'ETH';
+              const symbol = config.nativeSymbol;
+              const priceUsd = tokenPrices[config.coingeckoId] || 3500;
               allTokens.push({
                 symbol,
                 chain,
                 balance,
-                usdValue: balance * 3000 // Treat Testnet ETH as Real ETH price for demo simulation
+                usdValue: balance * priceUsd
               });
             }
           }
@@ -117,13 +126,17 @@ export class WalletScannerService {
                 const rawBalance = BigInt(token.tokenBalance).toString();
                 const balance = Number(rawBalance) / Math.pow(10, decimals);
 
-                // Kalkulasi usdValue (Untuk MVP hackathon kita gunakan dummy converter)
+                // Kalkulasi usdValue
                 let usdValue = 0;
-                if (symbol === 'USDC' || symbol === 'USDT') usdValue = balance;
-                else if (symbol === 'ETH' || symbol === 'WETH') usdValue = balance * 3000;
-                else if (symbol === 'BNB') usdValue = balance * 600;
-                else if (symbol === 'POL') usdValue = balance * 0.7;
-                else usdValue = balance * (chain.toLowerCase().includes('sepolia') ? 100 : 0.5); // Fallback testnet vs mainnet
+                const upperSymbol = symbol.toUpperCase();
+                
+                if (upperSymbol === 'USDC' || upperSymbol === 'USDT' || upperSymbol === 'DAI') {
+                  usdValue = balance;
+                } else if (upperSymbol === config.nativeSymbol) {
+                  usdValue = balance * (tokenPrices[config.coingeckoId] || 3500);
+                } else {
+                  usdValue = balance * (chain.toLowerCase().includes('sepolia') ? 10 : 0.5);
+                }
 
                 allTokens.push({
                   symbol,
