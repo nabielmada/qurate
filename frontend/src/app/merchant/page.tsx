@@ -20,6 +20,7 @@ export default function MerchantDashboard() {
   const [dbTransactions, setDbTransactions] = useState<any[]>([]);
   const [totalIdr, setTotalIdr] = useState<number>(0);
   const [favoriteToken, setFavoriteToken] = useState<string>('-');
+  const [aiInsight, setAiInsight] = useState<string>('Menganalisa data transaksi...');
 
   // Calculate dynamic stats
   const calculateStats = (txs: any[]) => {
@@ -44,6 +45,44 @@ export default function MerchantDashboard() {
     } else {
       setFavoriteToken('-');
     }
+
+    // Generate AI Insight Text
+    generateInsight(txs, sumIdr);
+  };
+
+  const generateInsight = (txs: any[], todaySumIdr: number) => {
+    if (txs.length === 0) {
+      setAiInsight("Belum ada data transaksi yang cukup untuk dianalisa.");
+      return;
+    }
+    
+    // Rata-rata belanja (keseluruhan data yg ditarik)
+    const sumAll = txs.reduce((acc, curr) => acc + Number(curr.amount_idr || 0), 0);
+    const avg = Math.round(sumAll / txs.length);
+
+    // Waktu tersibuk (Time range)
+    const hours = txs.map(t => t.created_at ? new Date(t.created_at).getHours() : -1).filter(h => h !== -1);
+    
+    let timeRange = "sepanjang hari";
+    if (hours.length > 0) {
+      const hourCounts: Record<number, number> = {};
+      hours.forEach(h => hourCounts[h] = (hourCounts[h] || 0) + 1);
+      const sortedHours = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
+      const peakHour = Number(sortedHours[0][0]);
+      // If hour is 13, show 13:00 - 15:00 to give a slight range
+      timeRange = `sekitar jam ${peakHour}:00 - ${peakHour+2}:00 WIB`;
+    }
+
+    // Metode terbanyak (Token + Chain)
+    const pairCounts: Record<string, number> = {};
+    txs.forEach(t => {
+       const pair = `${t.token_symbol || 'Token'} di jaringan ${t.chain || 'Base'}`;
+       pairCounts[pair] = (pairCounts[pair] || 0) + 1;
+    });
+    const sortedPairs = Object.entries(pairCounts).sort((a,b)=>b[1]-a[1]);
+    const topPair = sortedPairs.length > 0 ? sortedPairs[0][0] : 'USDC di Base';
+    
+    setAiInsight(`Pelanggan sering berbelanja ${timeRange}. Mayoritas dominan menggunakan ${topPair} mengingat biaya / kenyamanannya. Rata-rata ukuran keranjang belanja per struk adalah Rp ${avg.toLocaleString('id-ID')}.`);
   };
 
   useEffect(() => {
@@ -257,7 +296,7 @@ export default function MerchantDashboard() {
                 <span className="text-xl">✨</span> AI Insight
               </h3>
               <p className="text-sm font-medium text-blue-800 leading-relaxed max-w-lg">
-                Pelanggan kamu paling sering bayar antara jam 11-13 siang. Kebanyakan pakai USDC di jaringan Base karena lebih murah. Rata-rata belanja Rp 28.333.
+                {aiInsight}
               </p>
             </div>
             
