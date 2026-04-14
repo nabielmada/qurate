@@ -19,17 +19,17 @@ Our AI Agent automatically scans the user's wallet, selects the most optimal tok
 
 ### 1. Autonomous AI Routing
 Unlike traditional Web3 payment gateways (like Binance Pay or AEON) where users must manually select assets, Qurate's AI Agent:
-- Scans **all tokens** across **5+ chains** in parallel (Ethereum, Base, Polygon, Arbitrum, BSC).
-- Calculates a **Composite Efficiency Score** based on real-time gas fees, transaction speed, and liquidity.
-- Selects the most cost-effective path automatically.
+- Scans assets across **L2 Networks** (Base, Polygon, Ethereum) in real-time.
+- Calculates a **Composite Efficiency Score** based on live gas fees (IDR-equivalent), speed, and routing logic.
+- Selects the most cost-effective path automatically for zero-input execution.
 
-### 2. Natural Language Explainer (Gemini 2.5 Flash)
-Every transaction decision is narrated by **Google Gemini 2.5 Flash**. It translates complex blockchain logic into friendly messages:
+### 2. Natural Language Explainer (Gemini 1.5 Flash)
+Every transaction decision is narrated by **Google Gemini 1.5 Flash**. It translates complex blockchain logic into friendly messages:
 > *"Saya memilih USDC di jaringan Polygon karena biaya kirimnya hanya Rp 150 hari ini — jauh lebih murah dibanding opsi lainnya."*
 
 ### 3. Dynamic & Static QR Support
-- **Dynamic QR**: Integrated for digital cashiers with transaction-specific metadata.
-- **Static QR**: For street vendors/merchants; users simply scan and input the amount.
+- **Digital Cashier (POS)**: Integrated for merchants with transaction-specific payment routing.
+- **Unified QR**: Single scan point for all assets; AI Agent handles the network and bridge selection automatically.
 
 ### 4. Real-Time Bento UI
 A premium, minimalist dashboard that shows live activity, asset allocation, and real-time AI processing logs.
@@ -40,15 +40,15 @@ A premium, minimalist dashboard that shows live activity, asset allocation, and 
 
 Qurate is built as a **Monorepo** using [Turborepo](https://turbo.build/):
 
-- **`/frontend`**: Next.js 15 (App Router) + TailwindCSS 4.
+- **`/frontend`**: Next.js 15 (App Router) + TailwindCSS 4 + **Wagmi/Viem** (Web3 Connection Layer).
 - **`/backend`**: NestJS (Node.js) + Alchemy API for multichain scanning.
-- **`/contracts`**: Solidity (PayAIRouter) deployed on Base Sepolia.
-- **AI Engine**: Google Generative AI (Gemini 2.5 Flash) for intent parsing and decision narration.
+- **`/contracts`**: Solidity (PayAIRouter) deployed on **Base Sepolia**.
+- **AI Engine**: Google Generative AI (Gemini 1.5 Flash) for intent parsing and decision narration.
 
 ### Tech Stack Symbols
 - **Blockchain Data**: `Alchemy API`
-- **Reasoning**: `Gemini 2.5 Flash`
-- **Network**: `Base Sepolia` (Preferred) & `Polygon Amoy`
+- **Reasoning**: `Gemini 1.5 Flash`
+- **Settlement**: `Base Sepolia` (`0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE`)
 - **Communication**: `127.0.0.1` optimized for low-latency dev flow.
 
 ---
@@ -83,9 +83,10 @@ The app will be available at:
 ---
 
 ## 📄 Smart Contracts
-The `PayAIRouter.sol` contract serves as the settlement layer. 
-- **`payDirect`**: Enables instant token transfers to registered merchant IDs.
-- **`getMerchantWallet`**: Dynamic lookup for merchant settlement addresses.
+The `PayAIRouter.sol` contract serves as the trustless settlement layer. 
+- **`payNative`**: Handles direct ETH payments to registered merchant IDs (Our primary demo flow).
+- **`payDirect`**: Enables automated token transfers for ERC20 assets across various chains.
+- **`registerMerchant`**: Securely maps unique Merchant IDs to settlement wallet addresses.
 
 ---
 
