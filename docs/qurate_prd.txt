@@ -1,0 +1,538 @@
+﻿Qurate
+AI-Powered Web3 Payment Agent
+Product Requirements Document
+Version
+1.0.0 - Hackathon MVP
+Event
+Four.meme AI Sprint 2025
+Timeline
+4-week sprint
+Prize Pool
+$50,000 + incubation
+
+1. Executive Summary
+Qurate adalah platform pembayaran Web3 berbasis AI Agent yang memungkinkan siapapun membayar dengan crypto hanya dengan scan QR - tanpa perlu memahami token, chain, atau gas fee. AI Agent Qurate secara otomatis menganalisa wallet user, memilih token dan chain paling optimal, mengeksekusi transaksi, dan menjelaskan keputusannya dalam bahasa yang mudah dipahami orang awam.
+
+Core insight: AEON Pay sudah menyelesaikan masalah merchant-side (fiat settlement). Qurate menyelesaikan masalah yang AEON belum selesaikan: user-side intelligence - zero crypto knowledge required, truly autonomous AI Agent yang punya wallet sendiri dan bekerja tanpa intervensi user sama sekali.
+Problem Statement
+Crypto payment saat ini memiliki UX yang buruk untuk orang awam:
+• User harus tahu token apa yang mereka punya dan cocok dengan merchant
+• User harus manually approve setiap transaksi di wallet
+• User harus mengerti chain mana yang harus dipilih
+• Pesan error bersifat teknis dan tidak actionable (misalnya: 'insufficient gas error 0x...')
+• Tidak ada yang menjelaskan dalam bahasa manusia kenapa transaksi berhasil atau gagal
+
+Solution
+Qurate hadir sebagai lapisan AI di atas infrastruktur Web3 yang ada. User cukup scan QR, konfirmasi nominal, dan AI Agent yang mengerjakan sisanya - pemilihan token, pemilihan chain, kalkulasi gas, konversi, eksekusi, hingga notifikasi merchant.
+
+
+2. Product Vision & Goals
+2.1 Vision Statement
+"Qurate is the first truly autonomous AI payment agent for Web3 - where the user only decides to pay, and the AI handles everything else."
+2.2 Goals (Hackathon MVP)
+Goal
+Deskripsi
+G1 - Zero crypto knowledge
+User berhasil membayar tanpa mengerti token, chain, atau gas fee sama sekali
+G2 - Autonomous AI Agent
+AI Agent memiliki wallet sendiri, menganalisa, memutuskan, dan mengeksekusi tanpa manual approval user
+G3 - Natural language UX
+Setiap keputusan AI dijelaskan dalam Bahasa Indonesia yang mudah dipahami orang awam
+G4 - Multi-token support
+Support semua token utama (USDC, USDT, ETH, BNB, MATIC) dari semua chain utama
+G5 - Demo-ready in 4 weeks
+Prototype fungsional yang bisa didemonstrasikan kepada juri hackathon dengan smooth end-to-end flow
+2.3 Success Metrics (Hackathon)
+Metrik
+Target
+Keterangan
+End-to-end flow
+< 10 detik
+Dari scan QR hingga konfirmasi transaksi
+AI routing accuracy
+> 90%
+Keputusan AI memilih rute paling murah dan cepat
+Demo completion rate
+100%
+Semua 5 skenario demo berjalan tanpa error
+User comprehension
+100%
+Penjelasan AI dapat dipahami orang non-crypto
+Gas fee savings vs naive
+> 80%
+Dibanding jika user langsung pakai Ethereum mainnet
+
+3. Target Users
+3.1 Primary User - Dika (Crypto Holder Awam)
+Atribut
+Detail
+Profil
+Freelancer 24 tahun, terima bayaran USDC dari klien luar negeri, tidak terlalu paham DeFi
+Pain point utama
+Saldo crypto nganggur karena ribet dipake buat bayar sehari-hari
+Perilaku saat ini
+Exchange ke IDR dulu lewat Indodax, kena fee dan tunggu 1-3 hari
+Ekspektasi Qurate
+Bisa langsung scan QR di warung/toko, bayar pakai USDC, selesai
+Kemampuan teknis
+Bisa pakai MetaMask tapi tidak paham gas, slippage, atau chain selection
+3.2 Secondary User - Bu Sri (Merchant)
+Atribut
+Detail
+Profil
+Pemilik warung makan, 45 tahun, sudah terbiasa pakai QRIS BCA
+Pain point utama
+Tidak tahu cara terima crypto, takut rugi karena volatilitas
+Ekspektasi Qurate
+Pasang satu QR, uang masuk otomatis, tidak perlu paham crypto
+Kemampuan teknis
+Bisa scan QR, punya HP Android, tidak bisa install wallet
+Kebutuhan kritis
+Notifikasi real-time saat ada pembayaran masuk
+3.3 Tertiary User - Developer / Hackathon Judge
+Atribut
+Detail
+Profil
+Juri hackathon atau developer Web3 yang mengevaluasi inovasi produk
+Yang dicari
+Real AI utility, clean UX, differentiasi dari kompetitor, technical depth
+Pain point yang di-evaluate
+Apakah AI-nya genuine atau hanya gimmick? Apakah beda dari AEON?
+Ekspektasi demo
+Live working prototype, AI log yang transparan, clear value proposition
+
+4. Competitive Analysis
+4.1 Peta Kompetitor
+Fitur
+AEON Pay
+Binance Pay
+Solana Pay
+Qurate
+QR scan to pay
+Ya
+Ya
+Ya
+Ya
+Multi-chain support
+Ya
+Terbatas
+Solana only
+Ya
+Merchant terima fiat
+Ya
+Tidak
+Tidak
+Ya
+Auto pilih chain termurah
+Tidak
+Tidak
+Tidak
+Ya - AI
+Auto konversi token
+Swap Pay (manual approve)
+Tidak
+Tidak
+Ya - otomatis
+AI Agent punya wallet sendiri
+Belum ada
+Tidak
+Tidak
+Ya - core feature
+Penjelasan bahasa manusia
+Tidak
+Tidak
+Tidak
+Ya - Claude API
+Zero crypto knowledge UX
+Parsial
+Parsial
+Tidak
+Ya - penuh
+4.2 Key Differentiator
+Qurate bukan competitor AEON - Qurate adalah intelligence layer yang bisa berjalan DI ATAS AEON atau infrastruktur payment manapun. Nilai unik Qurate ada di AI Agent-nya yang benar-benar autonomous, bukan di merchant network-nya.
+
+5. Product Features
+5.1 Feature List & Priority
+#
+Fitur
+Deskripsi
+Priority
+Sprint
+F1
+Dynamic QR Generator
+Merchant generate QR per transaksi dengan nominal, merchant ID, dan expiry time tertanam
+P0 - Must
+Week 1
+F2
+Static QR (Merchant Permanent)
+QR permanen untuk merchant tanpa kasir digital, user input nominal sendiri
+P0 - Must
+Week 1
+F3
+Wallet Scanner
+AI scan semua token di wallet user lintas chain dalam satu waktu
+P0 - Must
+Week 1
+F4
+AI Chain Router
+AI memilih chain dan token terbaik berdasarkan gas fee real-time, speed, dan balance user
+P0 - Must
+Week 2
+F5
+Auto Token Conversion
+Konversi token otomatis via DEX (Uniswap/QuickSwap) tanpa manual approve user
+P0 - Must
+Week 2
+F6
+Natural Language Explainer
+Claude API menjelaskan keputusan AI dalam Bahasa Indonesia yang mudah dipahami
+P0 - Must
+Week 2
+F7
+Merchant Dashboard
+Dashboard web sederhana: generate QR, lihat history transaksi, stats harian
+P1 - Should
+Week 3
+F8
+Webhook Notifikasi
+Push notifikasi real-time ke merchant saat pembayaran masuk
+P1 - Should
+Week 3
+F9
+AI Agent Autonomous Wallet
+AI Agent memiliki wallet sendiri (ERC-4337 Account Abstraction)
+P1 - Should
+Week 3
+F10
+Transaction History User
+Riwayat transaksi user dengan penjelasan AI per transaksi
+P2 - Nice
+Week 4
+F11
+Spending Insight Merchant
+AI analisa pola transaksi merchant: jam ramai, token favorit, dll
+P2 - Nice
+Week 4
+F12
+Off-ramp IDR
+Konversi otomatis ke IDR dan kirim ke rekening bank merchant
+P3 - Future
+Post-hack
+
+6. AI Agent Specification
+6.1 Agent Architecture
+AI Agent Qurate terdiri dari 4 komponen utama yang bekerja secara sequential dalam setiap transaksi:
+
+Komponen 1 - Intent Parser
+Membaca dan memvalidasi QR payload. Mengekstrak: merchant ID, nominal IDR, token yang diterima, expiry time, dan transaction ID. Validasi: apakah QR masih berlaku, apakah merchant terdaftar, apakah nominal masuk akal.
+
+Komponen 2 - Wallet Intelligence
+Scan wallet user secara real-time menggunakan provider API (Alchemy/Moralis). Mengidentifikasi semua token di semua chain yang didukung. Kalkulasi USD value per token. Filter token yang nilainya cukup untuk membayar (minimal 105% dari nominal untuk cover gas).
+
+Komponen 3 - Route Optimizer
+Kalkulasi multi-variabel untuk memilih rute optimal:
+Variabel
+Logika
+Gas fee real-time
+Ambil dari gas oracle (Etherscan, Polygonscan, BaseScan) setiap 30 detik
+Transaction speed
+Estimasi waktu konfirmasi per chain (target < 5 detik untuk L2)
+Slippage estimate
+Kalkulasi slippage jika perlu swap token via DEX
+Token stability
+Prioritas stablecoin (USDC/USDT) dibanding volatile asset
+Chain preference
+Prioritas: Base > Arbitrum > Polygon > BSC > Ethereum
+Composite score
+Weighted score = (0.4 x gas) + (0.3 x speed) + (0.2 x stability) + (0.1 x liquidity)
+Komponen 4 - Natural Language Explainer
+Memanggil Claude API (claude-sonnet-4-20250514) dengan konteks transaksi untuk menghasilkan penjelasan yang:
+• Ditulis dalam Bahasa Indonesia yang mudah dipahami ibu-ibu pasar
+• Menjelaskan KENAPA token dan chain ini yang dipilih
+• Memberikan rasa aman: berapa yang dipotong, apakah transaksi aman
+• Tidak menggunakan istilah teknis (gas, chain, slippage, mempool, dll)
+
+6.2 AI Decision Logic Flowchart
+Urutan keputusan AI Agent per transaksi:
+1. Parse QR intent dan validasi expiry
+2. Scan semua token di wallet user
+3. Filter token yang balance-nya cukup (>= nominal + estimated gas)
+4. Jika tidak ada token yang cukup: kembalikan error dengan penjelasan human-friendly
+5. Dari token yang eligible, prioritaskan stablecoin
+6. Fetch gas price real-time untuk semua chain yang token tersedia
+7. Hitung composite score per opsi (token x chain)
+8. Pilih opsi dengan score tertinggi
+9. Panggil Claude API untuk generate penjelasan
+10. Build dan sign transaksi (atau trigger smart contract)
+11. Submit ke network dan tunggu konfirmasi
+12. Kirim webhook ke merchant dan update UI user
+
+6.3 Claude API Prompt Template
+System: Kamu adalah AI payment agent bernama Qurate. Tugasmu menjelaskan keputusan pembayaran crypto dalam bahasa yang mudah dipahami orang awam Indonesia. Jangan gunakan istilah teknis. Maksimal 3 kalimat pendek.
+User context yang disertakan: wallet balance, token yang dipilih, chain yang dipilih, gas fee, alasan pemilihan, dan nominal transaksi.
+
+7. Technical Specification
+7.1 Tech Stack
+Komponen
+Teknologi
+Frontend
+React + Vite + TailwindCSS + RainbowKit (wallet connect)
+Backend
+Node.js + Express + WebSocket (untuk real-time notif merchant)
+AI Agent
+Claude API (claude-sonnet-4-20250514) via Anthropic SDK
+Smart Contract
+Solidity - Qurate Router Contract di Base/Polygon testnet
+Wallet Abstraction
+ERC-4337 Account Abstraction (Biconomy SDK) untuk AI Agent wallet
+On-chain Swap
+Uniswap V3 SDK / QuickSwap (Polygon) untuk auto token conversion
+Gas Oracle
+Etherscan Gas Tracker API + Polygonscan + BaseScan
+Wallet Data
+Alchemy API untuk scan multi-chain token balance
+QR Engine
+qrcode.js untuk generate, jsQR untuk decode
+Stablecoin
+USDC (Circle) + USDT (Tether) sebagai preferred settlement token
+Testnet
+Base Sepolia + Polygon Mumbai untuk demo
+Database
+Supabase (PostgreSQL) untuk merchant data dan tx history
+7.2 Smart Contract Interface
+Qurate Router Contract menerima pembayaran dari berbagai token dan chain, melakukan swap jika diperlukan, dan mengirim ke wallet merchant:
+Function
+Deskripsi
+payWithAnyToken()
+Entry point utama - terima token apapun, routing ke swap atau direct transfer
+getOptimalRoute()
+View function - kalkulasi rute terbaik untuk kombinasi token + amount tertentu
+executeSwapAndPay()
+Swap token via DEX terintegrasi dan forward ke merchant
+directPay()
+Transfer langsung tanpa swap jika token sudah sesuai merchant
+getMerchantWallet()
+Lookup alamat wallet merchant dari merchant ID
+registerMerchant()
+Onboarding merchant baru dengan wallet address dan preferensi token
+7.3 QR Schema
+Qurate://pay?merchant=MERCHANT_ID&amount_idr=25000&amount_usd=1.543&accept=ANY&txid=TX-ABC123&expires=1713001800&sig=0xSIGNATURE
+Parameter
+Keterangan
+merchant
+ID unik merchant terdaftar di sistem Qurate
+amount_idr
+Nominal dalam Rupiah (IDR) yang harus dibayar
+amount_usd
+Ekuivalen USD menggunakan kurs saat QR di-generate
+accept
+ANY = AI pilihkan, atau spesifik token (USDC, USDT, dll)
+txid
+Transaction ID unik per QR untuk reconciliation
+expires
+Unix timestamp kapan QR expired (default: 120 detik)
+sig
+Digital signature dari merchant wallet untuk verifikasi keaslian QR
+
+8. User Flows
+8.1 Flow Utama - User Bayar dengan Qurate
+Step
+Aksi
+Step 1
+User membuka app Qurate dan scan QR yang ditempel merchant
+Step 2
+App decode QR dan tampilkan: nama merchant, nominal IDR, estimasi waktu
+Step 3
+AI Agent otomatis scan wallet user (tidak ada prompt ke user)
+Step 4
+Dalam < 2 detik, AI menampilkan: token yang akan dipakai, estimasi gas, penjelasan singkat
+Step 5
+User menekan tombol 'Bayar Sekarang' (satu-satunya input yang diperlukan)
+Step 6
+AI Agent build, sign, dan submit transaksi ke chain optimal
+Step 7
+Konfirmasi on-chain (2-5 detik di L2)
+Step 8
+Layar sukses ditampilkan ke user + webhook ke merchant
+8.2 Flow Merchant - Setup & Receive
+Step
+Aksi
+Step 1
+Merchant daftar di dashboard.Qurate.io dengan nama warung dan email
+Step 2
+Qurate generate merchant wallet (custodial) atau connect wallet sendiri
+Step 3
+Merchant download QR statis (untuk ditempel) atau aktifkan dynamic QR di kasir
+Step 4
+Saat ada pembayaran: merchant terima notifikasi push di HP
+Step 5
+Merchant lihat history di dashboard: waktu, jumlah IDR, token asal, chain
+Step 6
+(Opsional) Merchant request konversi saldo ke IDR dan kirim ke rekening bank
+8.3 Flow Error Handling
+Skenario Error
+Handling
+Saldo tidak cukup
+AI tampilkan: 'Saldo kamu kurang Rp X. Token terbanyak kamu adalah Y, masih kurang Z.'
+QR sudah expired
+Minta merchant generate QR baru, tampilkan tombol 'Minta QR Baru'
+Network congested
+AI switch ke chain alternatif dan informasikan user dengan bahasa sederhana
+Transaksi gagal on-chain
+AI jelaskan alasan dalam bahasa manusia dan tawarkan retry atau cancel
+Merchant wallet tidak valid
+Blokir transaksi dan tampilkan peringatan dengan instruksi kontak merchant
+
+9. Demo Script - Hackathon Presentation
+PENTING: Seluruh demo dilakukan di testnet (Base Sepolia + Polygon Mumbai). Semua token adalah test token. Tidak ada uang nyata yang berpindah selama demo. Durasi total demo: 8-10 menit.
+9.1 Opening Statement (1 menit)
+Kata-kata pembuka yang disarankan untuk presenter:
+"Setiap hari ada jutaan orang di Asia Tenggara yang memegang crypto tapi tidak bisa pakai crypto buat beli kopi. Bukan karena tidak ada merchant yang terima - tapi karena prosesnya terlalu rumit. Mereka harus tahu chain apa, token apa, approve ini itu. Qurate mengubah semua itu. Dengan Qurate, user cukup scan dan bayar. AI Agent kami yang mengerjakan sisanya - secara otomatis, transparan, dan bisa dijelaskan dalam bahasa yang dipahami siapapun."
+9.2 Demo Scenario 1 - Happy Path (2 menit)
+Skenario: Dika (freelancer) bayar makan siang di Warung Bu Sri menggunakan USDC yang dia punya di Base network.
+Step
+Detail
+Setup
+Siapkan wallet test dengan 50 USDC di Base Sepolia. Buka merchant dashboard di layar kedua.
+Aksi 1
+Buka Qurate merchant dashboard, input nominal Rp 25.000, klik Generate QR. QR muncul dengan countdown 120 detik.
+Aksi 2
+Di HP (atau browser kedua), buka Qurate user app. Klik Scan QR. Point ke QR yang baru dibuat.
+Highlight
+Tunjukkan bahwa user tidak perlu input apapun - AI langsung scan wallet dan tampilkan keputusan.
+Aksi 3
+Baca penjelasan AI: 'Saya akan membayar menggunakan 1.543 USDC di jaringan Base karena ini paling murah hari ini. Gas fee-nya cuma Rp 87.'
+Aksi 4
+Klik Bayar Sekarang. Tunjukkan AI routing log: chain selection, gas calculation, tx submission.
+Highlight
+Tunjukkan di merchant dashboard: notifikasi masuk real-time dalam < 5 detik.
+Aksi 5
+Tampilkan receipt dengan TX hash. Klik link ke Base Sepolia explorer untuk verifikasi on-chain.
+9.3 Demo Scenario 2 - AI Intelligence: Multi-token Wallet (2 menit)
+Skenario: User punya campuran token (ETH di Ethereum, BNB di BSC, USDT di Polygon). AI memilih yang paling optimal.
+Step
+Detail
+Setup
+Siapkan wallet test dengan: 0.01 ETH (Ethereum Sepolia), 0.05 BNB (BSC testnet), 30 USDT (Polygon Mumbai).
+Aksi
+Repeat flow scan QR dan bayar. Kali ini dengan nominal Rp 35.000.
+Key moment
+Pause di step AI routing. Tunjukkan bahwa AI mengevaluasi 3 token x 3 chain = 9 kombinasi.
+Highlight AI log
+Tunjukkan AI log: 'ETH di Ethereum: gas Rp 42.000 (lebih mahal dari belanjaannya!). BNB di BSC: gas Rp 290. USDT di Polygon: gas Rp 155. Dipilih: USDT di Polygon.'
+Penjelasan
+Baca penjelasan Claude: 'Saya pakai USDT kamu di Polygon karena ini yang paling hemat. Biaya kirimnya cuma Rp 155 - jauh lebih murah dari opsi lain.'
+Talking point
+Ini yang AEON tidak lakukan - di AEON, user harus pilih token dan chain sendiri. Di Qurate, AI yang mikirin.
+9.4 Demo Scenario 3 - Error Handling: Saldo Tidak Cukup (1 menit)
+Skenario: User coba bayar tapi saldo semua token tidak cukup. Tunjukkan AI error message yang human-friendly.
+Step
+Detail
+Setup
+Siapkan wallet test dengan balance sangat kecil: 0.0001 USDC ($0.0001)
+Aksi
+Scan QR dengan nominal Rp 50.000. Biarkan AI scan wallet.
+Highlight
+AI tidak menampilkan error code teknis - melainkan: 'Saldo kamu belum cukup untuk bayar Rp 50.000. Token terbesar kamu adalah USDC senilai Rp 1,6 - masih kurang Rp 49.998. Yuk top-up dulu!'
+Talking point
+Ini perbedaan fundamental. MetaMask bilang 'insufficient funds'. Qurate bilang 'kamu kurang berapa dan harus top-up berapa'.
+9.5 Demo Scenario 4 - Static QR untuk Pedagang Kaki Lima (1 menit)
+Skenario: Tunjukkan QR statis yang bisa dicetak dan ditempel - merchant tidak perlu device sama sekali untuk generate QR.
+Step
+Detail
+Aksi
+Buka merchant dashboard, pilih tab 'QR Statis'. Download QR. Cetak atau tampilkan di layar.
+Aksi 2
+User scan QR statis. Kali ini user input sendiri nominalnya: Rp 15.000.
+Highlight
+Tunjukkan bahwa merchant tidak perlu ada device sama sekali - cocok untuk pedagang kaki lima.
+Talking point
+Bu Sri tidak perlu HP canggih. Cukup print QR dan tempel di warung. Sama persis kayak QRIS yang sudah dia kenal.
+9.6 Demo Scenario 5 - Merchant Dashboard Analytics (1 menit)
+Skenario: Tunjukkan bahwa merchant dapat insight dari AI tentang transaksi mereka.
+Step
+Detail
+Aksi
+Buka merchant dashboard Bu Sri. Tampilkan 10 transaksi demo yang sudah di-seed.
+Highlight 1
+Grafik: jam ramai pembayaran, token favorit yang dipakai user, rata-rata nominal transaksi.
+Highlight 2
+AI Insight box: 'Pelanggan kamu paling sering bayar antara jam 11-13 siang. Kebanyakan pakai USDC. Rata-rata belanja Rp 28.000.'
+Talking point
+AEON kasih infrastruktur. Qurate kasih kecerdasan. Merchant bukan hanya terima pembayaran - mereka mendapat insight bisnis gratis.
+9.7 Closing Statement (30 detik)
+"Qurate bukan hanya payment gateway. Qurate adalah AI financial agent pertama yang benar-benar bekerja untuk user awam di ekosistem Web3. Kami tidak meminta user untuk belajar crypto - kami yang belajar tentang user dan bekerja untuk mereka."
+9.8 Antisipasi Pertanyaan Juri
+Pertanyaan
+Jawaban
+Bedanya apa sama AEON?
+AEON adalah infrastruktur merchant. Qurate adalah intelligence layer. Di AEON, user masih harus pilih token dan chain sendiri, dan approve setiap transaksi secara manual. Qurate fully autonomous - zero input dari user selain tombol bayar.
+AI-nya genuine atau gimmick?
+Claude API dipanggil real-time di setiap transaksi. Penjelasannya kontekstual - berbeda untuk setiap kombinasi wallet, token, dan merchant. Bukan template, bukan hardcoded.
+Legal di Indonesia?
+Untuk demo dan MVP, kami fokus ke cross-border use case yang jauh lebih clear secara regulasi. Untuk Indonesia domestik, kami framing sebagai konversi instan (crypto ke IDR) bukan pembayaran crypto langsung.
+Revenue model-nya apa?
+0.1% fee per transaksi (jauh lebih murah dari exchange fee 0.3-0.5%). Merchant subscription untuk dashboard premium dan AI analytics. B2B API untuk developer yang mau embed Qurate di app mereka.
+Apakah bisa production dalam 4 minggu?
+MVP untuk demo dan hackathon: yes. Production-grade dengan smart contract audit, KYC, dan lisensi: 6-12 bulan. Kami transparent tentang ini.
+Kenapa tidak launch token sendiri?
+Sesuai aturan hackathon Four.meme, tidak wajib issue token. Business model kami fee-based, lebih sustainable dari token model. Token bisa dipertimbangkan post-hackathon jika ada alasan product yang kuat.
+
+10. 4-Week Sprint Plan
+Minggu
+Focus
+Deliverable
+Definition of Done
+Week 1
+Foundation
+QR Generator (static + dynamic), Wallet Scanner, Basic UI user & merchant
+QR bisa di-scan, wallet balance terbaca dari testnet
+Week 2
+AI Core
+AI Router, Token Conversion, Claude API integration, Natural Language Explainer
+Transaksi end-to-end dari scan sampai konfirmasi on-chain
+Week 3
+Polish & Features
+Merchant Dashboard, Webhook, Error Handling, AI Analytics insight
+Semua 5 demo scenario berjalan tanpa error
+Week 4
+Demo Prep
+Bug fixing, demo script rehearsal, pitch deck, video demo backup
+Demo smooth 10x berturut-turut, pitch deck final
+10.1 Risk & Mitigation
+Risiko
+Mitigasi
+Smart contract bug saat demo
+Demo di testnet dengan contract yang sudah dicoba 50+ kali. Siapkan fallback: jika contract error, switch ke mocked response yang tetap menunjukkan AI logic dengan jelas.
+Claude API rate limit
+Cache response Claude untuk kombinasi transaksi yang sama. Siapkan fallback response yang pre-generated untuk demo scenarios.
+Gas price spike saat demo
+Demo di L2 testnet (Base Sepolia) di mana gas fee stabil dan hampir nol. Tidak bergantung pada Ethereum mainnet.
+Network connectivity issue
+Siapkan demo video backup yang direkam sebelumnya. Selalu bawa hotspot terpisah untuk demo device.
+Juri tanya sesuatu di luar skrip
+Semua anggota tim hafal competitive analysis, tech stack, dan revenue model. Assign satu orang sebagai technical backup untuk pertanyaan mendalam.
+
+11. Acceptance Criteria - Hackathon Submission
+11.1 Must Pass Before Submission
+• End-to-end transaksi berhasil dari QR scan hingga on-chain confirmation dalam < 10 detik
+• AI Router memilih chain yang benar (Base/Polygon) bukan Ethereum untuk test scenario
+• Claude API menghasilkan penjelasan yang contextual dan tidak menggunakan istilah teknis
+• Error scenario menampilkan pesan yang human-friendly, bukan error code
+• Merchant dashboard menampilkan notifikasi real-time saat pembayaran masuk
+• Semua 5 demo scenario dapat dijalankan berturut-turut tanpa restart atau manual fix
+• Demo berjalan stable di testnet selama minimal 2 jam tanpa gangguan
+
+11.2 Submission Checklist
+13. Working prototype URL (hosted, bukan localhost)
+14. Demo video 3 menit yang merekam happy path scenario
+15. GitHub repository dengan README yang jelas
+16. Pitch deck (10 slide maksimal)
+17. Smart contract address di testnet (terverifikasi di explorer)
+18. PRD dokumen ini sebagai lampiran teknis
+
+Dokumen ini bersifat living document dan akan diupdate setiap akhir sprint. Versi final untuk submission adalah versi yang diapprove setelah Week 4 demo rehearsal.
+Qurate  -  Product Requirements Document  |  Confidential
+
+Four.meme AI Sprint 2025  -  Internal Use Only	
+

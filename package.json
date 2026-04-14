@@ -1,0 +1,19 @@
+{
+  "name": "qurate",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint"
+  },
+  "workspaces": [
+    "frontend",
+    "backend",
+    "contracts"
+  ],
+  "devDependencies": {
+    "turbo": "latest"
+  }
+}
