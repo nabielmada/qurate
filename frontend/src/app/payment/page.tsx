@@ -22,7 +22,7 @@ type RouteCandidate = {
 };
 
 export default function PaymentFlow() {
-  const { address, isGuest } = useWallet();
+  const { address, isGuest, currency } = useWallet();
   const [step, setStep] = useState<'input' | 'analyzing' | 'decision' | 'confirmed'>('input');
   const [logs, setLogs] = useState<string[]>([]);
   const [bestRoute, setBestRoute] = useState<any>(null);
@@ -37,16 +37,46 @@ export default function PaymentFlow() {
   const merchantId = searchParams?.get('id') || 'm_nabiel_001';
   const urlAmount = searchParams?.get('amount');
   
-  const [amount, setAmount] = useState<number>(urlAmount ? Number(urlAmount) : 25000);
+  const [amount, setAmount] = useState<number>(urlAmount ? Number(urlAmount) : 0);
   const isAmountLocked = !!urlAmount;
-  const currency = 'IDR';
+
+  // Sync default amount based on currency if not locked
+  useEffect(() => {
+    if (!isAmountLocked && amount === 0) {
+      setAmount(currency === 'USD' ? 10 : 25000);
+    }
+  }, [currency, isAmountLocked, amount]);
 
   const [aiGreeting, setAiGreeting] = useState<string>("Sapaan AI...");
   const [lastPreferredChain, setLastPreferredChain] = useState<string | null>(null);
   
   const hasRun = useRef(false);
 
-  const currencySymbol = 'Rp';
+  const currencySymbols: Record<string, string> = {
+    IDR: 'Rp',
+    USD: '$',
+    MYR: 'RM',
+    SGD: 'S$',
+    EUR: '€',
+  };
+  const currencySymbol = currencySymbols[currency] || '$';
+
+  const formatValue = (val: number) => {
+    return val.toLocaleString(currency === 'IDR' ? 'id-ID' : 'en-US', {
+      maximumFractionDigits: currency === 'IDR' ? 0 : 2,
+      minimumFractionDigits: currency === 'IDR' ? 0 : 2
+    });
+  };
+
+  // For gas fees: use up to 4 decimal places for non-IDR to avoid showing "$0.00"
+  // when real on-chain gas is legitimately very small (e.g. $0.0004 on Base)
+  const formatGas = (val: number) => {
+    if (currency === 'IDR') return formatValue(val);
+    if (val > 0 && val < 0.01) {
+      return val.toLocaleString('en-US', { maximumFractionDigits: 4, minimumFractionDigits: 4 });
+    }
+    return formatValue(val);
+  };
 
   // Helper untuk menambahkan log dengan smooth
   const addLog = (msg: string) => {
@@ -92,7 +122,7 @@ export default function PaymentFlow() {
       // Step 0: Merchant info
       const merchantName = merchantData?.name || 'Merchant';
       addLog(`🏢 Merchant: ${merchantName}`);
-      addLog(`💵 Nominal pembayaran: Rp ${amount.toLocaleString('id-ID')}`);
+      addLog(`💵 Nominal pembayaran: ${currencySymbol} ${formatValue(amount)}`);
       await sleep(600);
 
       addLog("🛡️ Menghubungkan ke secure vault wallet Anda...");
@@ -259,6 +289,7 @@ export default function PaymentFlow() {
         merchant_id: merchantId,
         user_address: address,
         amount_idr: amount,
+        currency: currency,
         amount_token: usedRoute?.amountToken || 0,
         token_symbol: usedRoute?.token || 'ETH',
         chain: usedRoute?.chain || 'Base',
@@ -353,10 +384,10 @@ export default function PaymentFlow() {
               <div className="space-y-4 max-w-sm mx-auto w-full">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-                    Masukkan Nominal (Rupiah)
+                    Masukkan Nominal ({currency === 'IDR' ? 'Rupiah' : 'Dollar'})
                   </label>
                   <div className="relative">
-                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">Rp</span>
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-lg">{currencySymbol}</span>
                     <input
                       type="number"
                       value={amount}
@@ -392,7 +423,7 @@ export default function PaymentFlow() {
 
                 {!isAmountLocked && (
                   <div className="flex gap-2">
-                    {[10000, 25000, 50000, 100000].map(v => (
+                    {(currency === 'USD' ? [5, 10, 25, 50] : [10000, 25000, 50000, 100000]).map(v => (
                       <button
                         key={v}
                         onClick={() => setAmount(v)}
@@ -402,7 +433,7 @@ export default function PaymentFlow() {
                             : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                         }`}
                       >
-                        {(v / 1000)}K
+                        {currency === 'USD' ? `$${v}` : `${(v / 1000)}K`}
                       </button>
                     ))}
                   </div>
@@ -433,7 +464,7 @@ export default function PaymentFlow() {
                   </svg>
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">AI Agent memindai blockchain...</h2>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time Multichain Scan • Rp {amount.toLocaleString('id-ID')}</p>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Real-time Multichain Scan • {currencySymbol} {formatValue(amount)}</p>
               </div>
 
               <div className="space-y-3 font-medium text-slate-400 text-[11px] max-w-sm mx-auto w-full">
@@ -495,7 +526,7 @@ export default function PaymentFlow() {
                             <div className="text-[8px] text-slate-400 font-medium">{c.chain}</div>
                           </td>
                           <td className="px-4 py-3 font-bold text-slate-600">
-                            Rp {c.gasEstimateIdr.toLocaleString('id-ID')}
+                            {currencySymbol} {formatGas(c.gasEstimateIdr)}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
@@ -549,8 +580,8 @@ export default function PaymentFlow() {
                     <p className="text-lg font-bold">{bestRoute.token} <span className="text-blue-400 font-medium tracking-tight">on {bestRoute.chain}</span></p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total (IDR)</p>
-                    <h2 className="text-3xl font-bold mb-1">{currencySymbol} {amount.toLocaleString('id-ID')}</h2>
+                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Total ({currency})</p>
+                    <h2 className="text-3xl font-bold mb-1">{currencySymbol} {formatValue(amount)}</h2>
                   </div>
                 </div>
               </div>
@@ -609,7 +640,7 @@ export default function PaymentFlow() {
                 <div className="bg-slate-50/50 rounded-[2rem] p-6 border border-slate-100">
                   <div className="grid grid-cols-2 gap-y-4 text-xs font-medium">
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Nominal</div>
-                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">{currencySymbol} {amount.toLocaleString('id-ID')}</div>
+                    <div className="text-right font-bold text-slate-900 border-b border-slate-100 pb-1">{currencySymbol} {formatValue(amount)}</div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Sumber Dana</div>
                     <div className="text-right font-bold text-slate-900 leading-tight">
@@ -618,7 +649,7 @@ export default function PaymentFlow() {
                     </div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Biaya Gas (Est)</div>
-                    <div className="text-right font-bold text-emerald-600">Rp {bestRoute?.gasEstimateIdr?.toLocaleString('id-ID')}</div>
+                    <div className="text-right font-bold text-emerald-600">{currencySymbol} {formatGas(bestRoute?.gasEstimateIdr)}</div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Rute Dievaluasi</div>
                     <div className="text-right font-bold text-slate-900">{candidates.length} rute</div>

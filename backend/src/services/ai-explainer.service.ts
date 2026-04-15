@@ -27,7 +27,7 @@ export class AiExplainerService {
     candidates: RouteCandidate[] = [],
   ): Promise<string> {
     const symbol = this.currencyService.getSymbol(currency);
-    
+
     if (!this.client) {
       console.warn('GEMINI_API_KEY tidak dikonfigurasi. Menggunakan fallback lokal.');
       return `Saya merekomendasikan menggunakan ${routeData.token} di jaringan ${routeData.chain}. Biayanya sangat murah dan prosesnya cepat!`;
@@ -35,11 +35,18 @@ export class AiExplainerService {
 
     try {
       // Build comparative route table for Gemini
+      const formatVal = (v: number) => {
+        return v.toLocaleString(currency === 'IDR' ? 'id-ID' : 'en-US', {
+          maximumFractionDigits: currency === 'IDR' ? 0 : 2,
+          minimumFractionDigits: currency === 'IDR' ? 0 : 2
+        });
+      };
+
       let routeComparisonBlock = '';
       if (candidates.length > 1) {
         const routeLines = candidates.map((c, i) => {
           const tag = i === 0 ? '(DIPILIH ✓)' : `(Alternatif ${i})`;
-          return `  - Rute ${i + 1} ${tag}: ${c.token} / ${c.chain} — Biaya Rp ${c.gasEstimateIdr.toLocaleString('id-ID')}, Skor ${(c.score * 100).toFixed(0)}%`;
+          return `  - Rute ${i + 1} ${tag}: ${c.token} / ${c.chain} — Biaya ${symbol} ${formatVal(c.gasEstimateIdr)}, Skor ${(c.score * 100).toFixed(0)}%`;
         }).join('\n');
         routeComparisonBlock = `
         Semua Rute yang Dievaluasi AI (${candidates.length} rute):
@@ -52,9 +59,9 @@ ${routeLines}
         Tugas: Jelaskan mengapa AI memilih rute pembayaran ini kepada pengguna awam. Bandingkan dengan rute lain yang dievaluasi.
         
         Data Transaksi:
-        - Pelanggan membayar ${symbol} ${amount.toLocaleString()} ke merchant "${merchantName}".
+        - Pelanggan membayar ${symbol} ${formatVal(amount)} ke merchant "${merchantName}".
         - Strategi terpilih: Token ${routeData.token} di network ${routeData.chain}.
-        - Estimasi biaya admin/gas (dalam IDR): Rp ${routeData.gasEstimateIdr.toLocaleString('id-ID')}.
+        - Estimasi biaya admin/gas: ${symbol} ${formatVal(routeData.gasEstimateIdr)}.
         - Skor efisiensi AI: ${(routeData.score * 100).toFixed(0)}%.
         ${routeComparisonBlock}
         Instruksi:
@@ -65,9 +72,9 @@ ${routeLines}
         5. Jangan beri salam pembuka.
       `;
 
-      // Menggunakan model gemini-1.5-flash untuk stabilitas lebih baik
+      // Using gemini-2.0-flash (current stable model)
       const response = await this.client.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 

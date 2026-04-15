@@ -7,6 +7,7 @@ export interface TokenBalance {
   chain: string;
   balance: number;
   usdValue: number;
+  priceUsd: number;
 }
 
 @Injectable()
@@ -21,11 +22,11 @@ export class WalletScannerService {
     // 1. Khusus untuk Guest Mode (Demo)
     if (walletAddress === '0xGUEST') {
       return [
-        { symbol: 'ETH', chain: 'Ethereum', balance: 0.1245, usdValue: 435.75 },
-        { symbol: 'POL', chain: 'Polygon', balance: 850.00, usdValue: 595.00 },
-        { symbol: 'USDC', chain: 'Base', balance: 250.00, usdValue: 250.00 },
-        { symbol: 'ETH', chain: 'Base Sepolia', balance: 0.045, usdValue: 157.50 },
-        { symbol: 'ARB', chain: 'Arbitrum', balance: 120.50, usdValue: 120.50 },
+        { symbol: 'ETH', chain: 'Ethereum', balance: 0.1245, usdValue: 435.75, priceUsd: 3500 },
+        { symbol: 'POL', chain: 'Polygon', balance: 850.00, usdValue: 595.00, priceUsd: 0.70 },
+        { symbol: 'USDC', chain: 'Base', balance: 250.00, usdValue: 250.00, priceUsd: 1.00 },
+        { symbol: 'ETH', chain: 'Base Sepolia', balance: 0.045, usdValue: 157.50, priceUsd: 3500 },
+        { symbol: 'ARB', chain: 'Arbitrum', balance: 120.50, usdValue: 120.50, priceUsd: 1.00 },
       ];
     }
 
@@ -76,7 +77,8 @@ export class WalletScannerService {
                 symbol,
                 chain,
                 balance,
-                usdValue: balance * priceUsd
+                usdValue: balance * priceUsd,
+                priceUsd,
               });
             }
           }
@@ -138,11 +140,14 @@ export class WalletScannerService {
                   usdValue = balance * (chain.toLowerCase().includes('sepolia') ? 10 : 0.5);
                 }
 
+                // Derive priceUsd from usdValue/balance ratio
+                const priceUsd = balance > 0 ? usdValue / balance : 0;
                 allTokens.push({
                   symbol,
                   chain,
                   balance,
-                  usdValue
+                  usdValue,
+                  priceUsd,
                 });
               }
             } catch (error) {

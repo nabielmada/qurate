@@ -35,6 +35,11 @@ export class AiRouterService {
   private readonly alchemyKey: string;
   private readonly GAS_LIMIT = 100_000;
 
+  // Cache gas prices for 30s to avoid Alchemy 429s from double-calls
+  // (frontend calls /gas-prices and /route separately, both need gas data)
+  private gasPriceCache = new Map<string, { data: Record<string, number>; expiresAt: number }>();
+  private readonly GAS_CACHE_TTL_MS = 30_000;
+
   constructor(private readonly currencyService: CurrencyService) {
     this.alchemyKey = process.env.ALCHEMY_API_KEY || '';
   }
@@ -52,8 +57,15 @@ export class AiRouterService {
   /**
    * 1. Fungsi getGasPrices()
    * Fetch gas price real-time from Alchemy RPC
+   * Returns gas fee in the requested currency
    */
-  async getGasPrices(): Promise<Record<string, number>> {
+  async getGasPrices(targetCurrency: string = 'USD'): Promise<Record<string, number>> {
+    // Return cached result if still fresh
+    const cacheHit = this.gasPriceCache.get(targetCurrency);
+    if (cacheHit && cacheHit.expiresAt > Date.now()) {
+      return cacheHit.data;
+    }
+
     const chains = Object.keys(CHAIN_CONFIG);
     const coingeckoIds = Array.from(new Set(chains.map(c => CHAIN_CONFIG[c].coingeckoId)));
     
@@ -62,14 +74,23 @@ export class AiRouterService {
       this.currencyService.getTokenPrices(coingeckoIds),
       this.currencyService.getLatestRates()
     ]);
-    const idrRate = idrRates['IDR'] || 16000;
+    
+    const targetRate = idrRates[targetCurrency.toUpperCase()] || 1;
 
     const results: Record<string, number> = {};
 
-    // Fetch gas prices from Alchemy in parallel
+    // Fetch gas prices from Alchemy in parallel (skip disabled chains)
     await Promise.all(chains.map(async (chainName) => {
+      const config = CHAIN_CONFIG[chainName];
+
+      // Skip chains not enabled on this Alchemy key — use static fallback directly
+      if (!config.enabled) {
+        const defaultUsd = chainName === 'Ethereum' ? 2.5 : 0.08;
+        results[chainName] = defaultUsd * targetRate;
+        return;
+      }
+
       try {
-        const config = CHAIN_CONFIG[chainName];
         const url = `https://${config.network}.g.alchemy.com/v2/${this.alchemyKey}`;
         
         const response = await fetch(url, {
@@ -90,26 +111,41 @@ export class AiRouterService {
         }
 
         const data = await response.json();
-        const gasPriceWei = BigInt(data.result || '0');
+        if (!data.result || data.result === '0x0' || data.error) {
+          throw new Error(`INVALID_GAS_RESPONSE: ${JSON.stringify(data.error || 'null result')}`);
+        }
+        const gasPriceWei = BigInt(data.result);
         const gasPriceEth = Number(gasPriceWei) / 1e18;
         
         // Fee = GasPrice * GasLimit
         const feeEth = gasPriceEth * this.GAS_LIMIT;
         
-        // Convert to IDR: Eth * TokenPrice(USD) * IDR_Rate
+        // Convert to target currency: Eth * TokenPrice(USD) * targetRate
         const tokenPriceUsd = tokenPrices[config.coingeckoId] || 0;
-        const feeIdr = feeEth * tokenPriceUsd * idrRate;
-        
-        // Tambahkan buffer 20% untuk safety di UI
-        results[chainName] = Math.round(feeIdr * 1.2);
+        const rawFeeUsd = feeEth * tokenPriceUsd;
+
+        // Apply practical minimum floor — real Base gas can be ~$0.0004,
+        // which would display as "$0.00". Floor ensures always-meaningful display.
+        const minFeeUsd = chainName === 'Ethereum' ? 1.5 : 0.05;
+        const effectiveFeeUsd = Math.max(rawFeeUsd, minFeeUsd);
+
+        // Add 20% buffer for safety, then convert to target currency
+        results[chainName] = effectiveFeeUsd * 1.2 * targetRate;
       } catch (error) {
         console.error(`Error fetching gas price for ${chainName}:`, error);
-        results[chainName] = chainName === 'Ethereum' ? 50000 : 500; // Realistic defaults
+        // Realistic fallback defaults in USD then convert
+        const defaultUsd = chainName === 'Ethereum' ? 2.5 : 0.05;
+        results[chainName] = defaultUsd * targetRate;
       }
     }));
 
-    // Support BSC as mock because Alchemy doesn't support it for free
-    if (!results['BSC']) results['BSC'] = 300;
+    // Support BSC as mock
+    if (!results['BSC']) {
+      results['BSC'] = 0.02 * targetRate;
+    }
+
+    // Store in cache
+    this.gasPriceCache.set(targetCurrency, { data: results, expiresAt: Date.now() + this.GAS_CACHE_TTL_MS });
 
     return results;
   }
@@ -118,15 +154,15 @@ export class AiRouterService {
    * 2. Fungsi calculateScore(token, chain, gasPrice, speed)
    * Returns composite score AND per-component breakdown for AI decision transparency
    */
-  calculateScore(token: string, chain: string, gasPrice: number, speed: number): {
+  calculateScore(token: string, chain: string, gasPriceUsd: number, speed: number): {
     total: number;
     gasEfficiency: number;
     speedScore: number;
     stableBonus: number;
     liquidityScore: number;
   } {
-    // Asumsi biaya gas tertinggi yg ditoleransi = Rp 50.000
-    const gasEfficiency = Math.max(0, 1 - (gasPrice / 50000));
+    // Threshold efisiensi gas dlm USD: Kita anggap $2.00 adalah batas "mahal"
+    const gasEfficiency = Math.max(0, 1 - (gasPriceUsd / 2.0));
     
     // Asumsi speed paling lambat yg ditoleransi = 15 detik
     const speedScore = Math.max(0, 1 - (speed / 15));
@@ -147,45 +183,43 @@ export class AiRouterService {
    * 3. Fungsi findOptimalRoute(walletTokens, amount, currency)
    * Returns the best route AND all evaluated candidates with score breakdowns
    */
-  async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'IDR'): Promise<RouteResult | null> {
-    // KONVERSI MATA UANG KE USD
+  async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'USD'): Promise<RouteResult | null> {
+    // 1. Convert amount request ke USD pivot (PENTING: Selalu hitung buffer dalam USD)
     const amountUSD = await this.currencyService.convertToUSD(amount, currency);
-    
-    // Filter token yang balance cukup dengan buffer 5%
     const minRequiredUSD = amountUSD * 1.05; 
+    
+    // 2. Filter token yang balance cukup
     const eligibleTokens = walletTokens.filter(t => t.usdValue >= minRequiredUSD);
 
     if (eligibleTokens.length === 0) {
       return null;
     }
 
-    const gasPrices = await this.getGasPrices();
+    // 3. Ambil data gas dalam currency yang diminta
+    const gasPricesTarget = await this.getGasPrices(currency);
     const idrRates = await this.currencyService.getLatestRates();
-    const idrRate = idrRates['IDR'] || 16000;
+    const targetToUsdRate = 1 / (idrRates[currency.toUpperCase()] || 1);
     
-    // Fetch token prices for all possibly best tokens
-    const coingeckoIds = Array.from(new Set(eligibleTokens.map(t => CHAIN_CONFIG[t.chain].coingeckoId)));
-    const tokenPricesUsd = await this.currencyService.getTokenPrices(coingeckoIds);
-    
-    // Evaluate ALL candidates with full score breakdown
+    // Evaluate ALL candidates
     const candidates: RouteCandidate[] = [];
 
     for (const token of eligibleTokens) {
-      const gPrice = gasPrices[token.chain] || 50000;
+      const gPriceTarget = gasPricesTarget[token.chain] || (currency === 'USD' ? 0.05 : 500);
       const speed = this.SPEEDS[token.chain as keyof typeof this.SPEEDS] || 15;
       
-      const config = CHAIN_CONFIG[token.chain];
-      const tokenPriceUsd = tokenPricesUsd[config.coingeckoId] || 3500;
-      
-      // Hitung amountToken: (IDR / IDR_per_USD) / USD_per_Token
-      const amountToken = (amount / idrRate) / tokenPriceUsd;
+      // Hitung Gas dlm USD untuk scoring yang adil
+      const gPriceUsd = gPriceTarget * targetToUsdRate;
 
-      const scoreResult = this.calculateScore(token.symbol, token.chain, gPrice, speed);
+      // Hitung amountToken: USD_Amount / USD_per_Token
+      const amountToken = amountUSD / token.priceUsd;
+
+      // Scoring menggunakan USD base ($2.00 threshold)
+      const scoreResult = this.calculateScore(token.symbol, token.chain, gPriceUsd, speed);
       
       candidates.push({
         token: token.symbol,
         chain: token.chain,
-        gasEstimateIdr: gPrice,
+        gasEstimateIdr: gPriceTarget, // Kita pakai nama gasEstimateIdr tapi isinya adalah targetCurrency
         amountToken: Number(amountToken.toFixed(8)),
         score: scoreResult.total,
         gasEfficiency: scoreResult.gasEfficiency,
@@ -195,7 +229,7 @@ export class AiRouterService {
       });
     }
 
-    // Sort by score descending — best route first
+    // Sort by score descending
     candidates.sort((a, b) => b.score - a.score);
 
     const winner = candidates[0];
@@ -205,7 +239,7 @@ export class AiRouterService {
       gasEstimateIdr: winner.gasEstimateIdr,
       amountToken: winner.amountToken,
       score: winner.score,
-      reasoning: `Skor efisiensi: ${(winner.score * 100).toFixed(0)}%. ${winner.token} di ${winner.chain} dipilih dari ${candidates.length} rute yang dievaluasi.`,
+      reasoning: `Efficiency score: ${(winner.score * 100).toFixed(0)}%. ${winner.token} on ${winner.chain} selected because it provides best balance between gas and speed. Evaluated ${candidates.length} routes.`,
     };
 
     return { best, candidates };

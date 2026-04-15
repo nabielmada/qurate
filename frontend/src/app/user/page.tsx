@@ -2,19 +2,31 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
 import { supabase } from '@/lib/supabase';
 import { apiUrl } from '@/lib/api';
 
 export default function UserDashboard() {
-  const { address, isGuest, logout } = useWallet();
+  const { address, isGuest, logout, currency, setCurrency } = useWallet();
+  const router = useRouter();
   const [tokens, setTokens] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [currency, setCurrency] = useState<'IDR' | 'USD' | 'MYR' | 'SGD' | 'EUR'>('IDR');
   const [rates, setRates] = useState<Record<string, number>>({ IDR: 16000, USD: 1, MYR: 4.7, SGD: 1.35, EUR: 0.94 });
   const hasRun = useRef(false);
+
+  // Safeguard: Redirect if not connected and not guest after hydration
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!address && !isGuest) {
+        router.push('/');
+      }
+    }, 2000); // 2 second grace period for wagmi to hydrate
+
+    return () => clearTimeout(timeout);
+  }, [address, isGuest, router]);
 
   const defaultRates: Record<string, number> = {
     USD: 1,
@@ -229,10 +241,18 @@ export default function UserDashboard() {
                     </div>
                   </div>
                   <p className={`text-xs font-bold text-slate-900`}>
-                    -{currencySymbols[currency]} {(Number(tx.amount_idr) / (rates['IDR'] || 16000) * (rates[currency] || 1)).toLocaleString(undefined, {
-                      maximumFractionDigits: currency === 'IDR' ? 0 : 2,
-                      minimumFractionDigits: currency === 'IDR' ? 0 : 2
-                    })}
+                    -{currencySymbols[currency]} {(() => {
+                      const txAmount = Number(tx.amount_idr);
+                      const txCurrency = tx.currency || 'IDR';
+                      // Convert: txAmount (in txCurrency) → USD → display currency
+                      const txToUsd = txCurrency === 'USD' ? 1 : (1 / (rates[txCurrency] || 1));
+                      const amountUsd = txAmount * txToUsd;
+                      const displayAmount = amountUsd * (rates[currency] || 1);
+                      return displayAmount.toLocaleString(currency === 'IDR' ? 'id-ID' : 'en-US', {
+                        maximumFractionDigits: currency === 'IDR' ? 0 : 2,
+                        minimumFractionDigits: currency === 'IDR' ? 0 : 2
+                      });
+                    })()}
                   </p>
                 </div>
               ))
