@@ -19,8 +19,9 @@ export default function MerchantQR({
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Format: qurate://pay?merchant=ID&amount_idr=NOMINAL&accept=ANY&txid=TXID&expires=TIMESTAMP
-  const qrString = `qurate://pay?merchant=${merchantId}&amount_idr=${amountIdr}&accept=ANY&txid=${txId}&expires=${expires}`;
+  // Default origin fallback for SSR
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const qrString = `${origin}/payment?merchant=${merchantId}&amount=${amountIdr}&accept=ANY&txid=${txId}&expires=${expires}`;
 
   // Countdown logic
   useEffect(() => {

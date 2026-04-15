@@ -39,6 +39,7 @@ export default function Home() {
              <a href="#skenario" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Skenario</a>
              <a href="#fitur" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Fitur</a>
              <a href="#faq" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">FAQ</a>
+             <Link href="/merchant/register" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Merchant Portal</Link>
              <a href="https://four.meme" target="_blank" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1 font-black bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">Hackathon ↗</a>
           </div>
           <div className="flex items-center gap-4">

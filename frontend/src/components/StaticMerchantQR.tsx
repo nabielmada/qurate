@@ -17,7 +17,8 @@ export default function StaticMerchantQR({ merchantId, merchantName }: StaticMer
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Payment page URL that users will be directed to after scanning
-  const qrString = `qurate://pay?merchant=${merchantId}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const qrString = `${origin}/payment?merchant=${merchantId}`;
 
   useEffect(() => {
     if (canvasRef.current) {

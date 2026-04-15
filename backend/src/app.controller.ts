@@ -52,4 +52,12 @@ export class AppController {
     }
     return { success: true, merchant };
   }
+
+  @Post('merchants')
+  async registerMerchant(@Body() body: { name: string; walletAddress: string }) {
+    if (!body.name || !body.walletAddress) {
+      return { success: false, message: 'Name and walletAddress are required' };
+    }
+    return await this.merchantService.createMerchant(body.name, body.walletAddress);
+  }
 }

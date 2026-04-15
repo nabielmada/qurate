@@ -34,9 +34,9 @@ export default function PaymentFlow() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const merchantId = searchParams?.get('id') || 'm_nabiel_001';
+  const merchantId = searchParams?.get('merchant') || 'm_ad2d9e45';
   const urlAmount = searchParams?.get('amount');
-  
+
   const [amount, setAmount] = useState<number>(urlAmount ? Number(urlAmount) : 0);
   const isAmountLocked = !!urlAmount;
 
@@ -49,7 +49,7 @@ export default function PaymentFlow() {
 
   const [aiGreeting, setAiGreeting] = useState<string>("Sapaan AI...");
   const [lastPreferredChain, setLastPreferredChain] = useState<string | null>(null);
-  
+
   const hasRun = useRef(false);
 
   const currencySymbols: Record<string, string> = {
@@ -118,7 +118,7 @@ export default function PaymentFlow() {
 
     try {
       setLoadingRealData(true);
-      
+
       // Step 0: Merchant info
       const merchantName = merchantData?.name || 'Merchant';
       addLog(`🏢 Merchant: ${merchantName}`);
@@ -127,7 +127,7 @@ export default function PaymentFlow() {
 
       addLog("🛡️ Menghubungkan ke secure vault wallet Anda...");
       await sleep(800);
-      
+
       // Step 2: Scan
       addLog("💰 Memindai saldo multichain (Ethereum, Polygon, Base, Arbitrum)...");
       const scanRes = await fetch(apiUrl(`/scan/${address}`));
@@ -150,7 +150,7 @@ export default function PaymentFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tokens, amount, currency })
       });
-      
+
       if (!routeRes.ok) {
         throw new Error('API_ROUTE_ERROR');
       }
@@ -158,7 +158,7 @@ export default function PaymentFlow() {
       const routeResponse = await routeRes.json();
       const routeData = routeResponse.data;
       const allCandidates: RouteCandidate[] = routeResponse.candidates || [];
-      
+
       if (!routeData) {
         throw new Error('SALDO_INSUFFICIENT');
       }
@@ -177,10 +177,10 @@ export default function PaymentFlow() {
         const explainRes = await fetch(apiUrl('/explain'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            routeData, 
-            merchantName, 
-            amount, 
+          body: JSON.stringify({
+            routeData,
+            merchantName,
+            amount,
             currency,
             candidates: allCandidates,
           })
@@ -213,13 +213,13 @@ export default function PaymentFlow() {
     try {
       setIsProcessing(true);
       setLogs(prev => [...prev, "🚀 Memproses pembayaran..."]);
-      
+
       let finalHash = "";
       let usedRoute = bestRoute;
-      
+
       if (!isGuest && address) {
         setLogs(prev => [...prev, "🔐 Menghubungkan ke Wallet..."]);
-        
+
         const CONTRACT_ADDRESS = "0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE" as `0x${string}`;
         const ABI = [
           {
@@ -246,7 +246,7 @@ export default function PaymentFlow() {
 
             const amountTokenStr = currentRoute?.amountToken?.toString() || "0";
             setLogs(prev => [...prev, "✍️ Silakan tanda tangani di MetaMask..."]);
-            
+
             const hash = await writeContractAsync({
               address: CONTRACT_ADDRESS,
               abi: ABI,
@@ -278,7 +278,7 @@ export default function PaymentFlow() {
           return;
         }
         await sleep(1500);
-        finalHash = "0x" + Math.random().toString(16).slice(2, 42); 
+        finalHash = "0x" + Math.random().toString(16).slice(2, 42);
       }
 
       setTxHash(finalHash);
@@ -319,7 +319,7 @@ export default function PaymentFlow() {
   // Score bar component
   const ScoreBar = ({ value, color }: { value: number; color: string }) => (
     <div className="w-full bg-slate-100 rounded-full h-1.5">
-      <div 
+      <div
         className={`h-1.5 rounded-full transition-all duration-700 ${color}`}
         style={{ width: `${Math.max(value * 100, 4)}%` }}
       />
@@ -343,18 +343,16 @@ export default function PaymentFlow() {
           ].map((s, i, arr) => (
             <React.Fragment key={s.key}>
               <div className="flex items-center gap-2">
-                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${
-                  step === s.key 
-                    ? s.key === 'confirmed' 
-                      ? 'bg-emerald-500 scale-125 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
-                      : 'bg-blue-600 scale-125 shadow-[0_0_10px_rgba(37,99,235,0.4)]'
-                    : 'bg-slate-300'
-                }`}></div>
-                <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${
-                  step === s.key 
-                    ? s.key === 'confirmed' ? 'text-emerald-500' : 'text-blue-600' 
-                    : 'text-slate-400'
-                }`}>{s.label}</span>
+                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${step === s.key
+                  ? s.key === 'confirmed'
+                    ? 'bg-emerald-500 scale-125 shadow-[0_0_10px_rgba(16,185,129,0.4)]'
+                    : 'bg-blue-600 scale-125 shadow-[0_0_10px_rgba(37,99,235,0.4)]'
+                  : 'bg-slate-300'
+                  }`}></div>
+                <span className={`text-[9px] font-bold uppercase transition-colors duration-500 ${step === s.key
+                  ? s.key === 'confirmed' ? 'text-emerald-500' : 'text-blue-600'
+                  : 'text-slate-400'
+                  }`}>{s.label}</span>
               </div>
               {i < arr.length - 1 && <div className="flex-1 h-[1px] bg-slate-200 mx-4"></div>}
             </React.Fragment>
@@ -363,7 +361,7 @@ export default function PaymentFlow() {
 
         {/* MAIN PANEL */}
         <div className="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-6 md:p-10 border border-white flex flex-col min-h-[480px]">
-          
+
           {/* STEP: INPUT AMOUNT */}
           {step === 'input' && (
             <div className="flex flex-col flex-1 animate-fade-in">
@@ -393,11 +391,10 @@ export default function PaymentFlow() {
                       value={amount}
                       onChange={(e) => setAmount(Number(e.target.value))}
                       readOnly={isAmountLocked}
-                      className={`w-full border-2 rounded-2xl p-4 pl-14 text-2xl font-black focus:outline-none transition ${
-                        isAmountLocked 
-                          ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' 
-                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white'
-                      }`}
+                      className={`w-full border-2 rounded-2xl p-4 pl-14 text-2xl font-black focus:outline-none transition ${isAmountLocked
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500 focus:bg-white'
+                        }`}
                       placeholder="25000"
                       min={1000}
                     />
@@ -412,13 +409,13 @@ export default function PaymentFlow() {
 
                 {/* AI GREETING / MEMORY BOX */}
                 <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 relative overflow-hidden group">
-                   <div className="absolute right-0 top-0 opacity-[0.03] transform translate-x-1/4 -translate-y-1/4">
-                      <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13h-13L12 6.5z"/></svg>
-                   </div>
-                   <div className="flex gap-3">
-                      <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xs shadow-lg shadow-blue-200 flex-shrink-0">✨</div>
-                      <p className="text-[11px] text-blue-800 font-medium leading-relaxed italic">&ldquo;{aiGreeting}&rdquo;</p>
-                   </div>
+                  <div className="absolute right-0 top-0 opacity-[0.03] transform translate-x-1/4 -translate-y-1/4">
+                    <svg className="w-20 h-20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13h-13L12 6.5z" /></svg>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xs shadow-lg shadow-blue-200 flex-shrink-0">✨</div>
+                    <p className="text-[11px] text-blue-800 font-medium leading-relaxed italic">&ldquo;{aiGreeting}&rdquo;</p>
+                  </div>
                 </div>
 
                 {!isAmountLocked && (
@@ -427,11 +424,10 @@ export default function PaymentFlow() {
                       <button
                         key={v}
                         onClick={() => setAmount(v)}
-                        className={`flex-1 py-2 text-xs font-bold rounded-xl border-2 transition ${
-                          amount === v 
-                            ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                        }`}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl border-2 transition ${amount === v
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                          }`}
                       >
                         {currency === 'USD' ? `$${v}` : `${(v / 1000)}K`}
                       </button>
@@ -439,14 +435,13 @@ export default function PaymentFlow() {
                   </div>
                 )}
 
-                <button 
+                <button
                   onClick={startAIEngine}
                   disabled={amount <= 0 || !address}
-                  className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl text-sm mt-4 ${
-                    amount > 0 && address
-                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 transform active:scale-95'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  }`}
+                  className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl text-sm mt-4 ${amount > 0 && address
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 transform active:scale-95'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    }`}
                 >
                   🤖 Analisis Pembayaran dengan AI
                 </button>
@@ -602,11 +597,10 @@ export default function PaymentFlow() {
               <button
                 onClick={handleConfirm}
                 disabled={isProcessing}
-                className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl transform active:scale-95 text-sm flex items-center justify-center gap-3 ${
-                  isProcessing 
-                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
-                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
-                }`}
+                className={`w-full font-bold py-4 rounded-3xl transition-all shadow-xl transform active:scale-95 text-sm flex items-center justify-center gap-3 ${isProcessing
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+                  }`}
               >
                 {isProcessing ? (
                   <>
@@ -644,8 +638,8 @@ export default function PaymentFlow() {
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Sumber Dana</div>
                     <div className="text-right font-bold text-slate-900 leading-tight">
-                       <div>{bestRoute?.token}</div>
-                       <div className="text-[9px] text-blue-600 uppercase">{bestRoute?.chain}</div>
+                      <div>{bestRoute?.token}</div>
+                      <div className="text-[9px] text-blue-600 uppercase">{bestRoute?.chain}</div>
                     </div>
 
                     <div className="text-slate-400 font-bold uppercase text-[9px]">Biaya Gas (Est)</div>
@@ -662,7 +656,7 @@ export default function PaymentFlow() {
                     <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-2">TX Hash</p>
                     <p className="text-[10px] font-mono text-slate-600 break-all bg-slate-50 p-2 rounded-lg border border-slate-100">{txHash}</p>
                     {!isGuest && (
-                      <a 
+                      <a
                         href={`https://sepolia.basescan.org/tx/${txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
