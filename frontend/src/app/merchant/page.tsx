@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useWatchContractEvent } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import MerchantQR from '@/components/MerchantQR';
 import StaticMerchantQR from '@/components/StaticMerchantQR';
 import { supabase } from '@/lib/supabase';
 import { apiUrl } from '@/lib/api';
-import { CheckCircle2, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Sparkles, X } from 'lucide-react';
 
 // Static ABI and Contract specifically for this routing scenario
 const CONTRACT_ADDRESS = "0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE" as `0x${string}`;
@@ -33,6 +33,18 @@ const PayAIRouterABI = [
     ],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": false, "internalType": "string", "name": "merchantId", "type": "string" },
+      { "indexed": true, "internalType": "address", "name": "merchantAddress", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "sender", "type": "address" },
+      { "indexed": false, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "PaymentReceived",
+    "type": "event"
   }
 ];
 
@@ -58,6 +70,10 @@ export default function MerchantDashboard() {
   const [totalIdr, setTotalIdr] = useState<number>(0);
   const [favoriteToken, setFavoriteToken] = useState<string>('-');
   const [aiInsight, setAiInsight] = useState<string>('Menganalisa data transaksi...');
+  
+  // Real-time Notification State
+  const [newPayment, setNewPayment] = useState<any | null>(null);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   // Smart Contract Interaction
   const { data: contractWallet, refetch: refetchContract } = useReadContract({
@@ -99,6 +115,39 @@ export default function MerchantDashboard() {
       console.error("Gagal sinkronisasi blockchain:", e);
     }
   };
+
+  // 1. Real-time On-Chain Watcher
+  useWatchContractEvent({
+    address: CONTRACT_ADDRESS,
+    abi: PayAIRouterABI,
+    eventName: 'PaymentReceived',
+    onLogs(logs: any) {
+      logs.forEach((log: any) => {
+        if (log.args.merchantId === merchantId) {
+          console.log("🔥 On-Chain Payment Detected!", log.args);
+          setNewPayment({
+            amount: log.args.amount,
+            sender: log.args.sender,
+          });
+          setShowOverlay(true);
+          
+          // Play sound (Optional browser behavior)
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
+            audio.play();
+          } catch(e) {}
+        }
+      });
+    },
+  });
+
+  // Reset overlay after 8 seconds
+  useEffect(() => {
+    if (showOverlay) {
+      const timer = setTimeout(() => setShowOverlay(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [showOverlay]);
 
   // On Load: Verify Merchant Setup
   useEffect(() => {
@@ -211,6 +260,21 @@ export default function MerchantDashboard() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, (payload) => {
         if (payload.new && payload.new.merchant_id === merchantId) {
           fetchHistory();
+          
+          // Trigger notification for Guest Mode or if On-chain event hasn't already fired
+          if (!showOverlay) {
+            setNewPayment({
+              amount: payload.new.amount_token,
+              sender: payload.new.user_address || 'Guest User',
+            });
+            setShowOverlay(true);
+            
+            // Audio skip if already played by hook is handled by short-circuit above
+            try {
+              const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
+              audio.play();
+            } catch(e) {}
+          }
         }
       })
       .subscribe((status) => {
@@ -460,6 +524,57 @@ export default function MerchantDashboard() {
         </div>
       </div>
       
+      {/* Real-time Payment Success Overlay */}
+      {showOverlay && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-[3rem] p-10 max-w-sm w-full shadow-2xl border-4 border-emerald-400 relative overflow-hidden animate-in zoom-in slide-in-from-bottom-10 duration-500">
+              <div className="absolute top-0 right-0 p-4">
+                 <button onClick={() => setShowOverlay(false)} className="text-slate-300 hover:text-slate-500 transition">
+                    <X size={24} />
+                 </button>
+              </div>
+              
+              <div className="flex flex-col items-center text-center space-y-6">
+                 <div className="relative">
+                    <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center animate-bounce">
+                       <Sparkles size={48} />
+                    </div>
+                    <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-2 rounded-full animate-pulse shadow-lg">
+                       <CheckCircle2 size={24} />
+                    </div>
+                 </div>
+
+                 <div>
+                    <h2 className="text-3xl font-black text-slate-900 mb-2">BINGGO! 💰</h2>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Pembayaran Baru Diterima</p>
+                 </div>
+
+                 <div className="bg-slate-50 w-full p-6 rounded-3xl border-2 border-slate-100">
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-1">Status Blokir (Atomik)</p>
+                    <p className="text-2xl font-black text-emerald-600">DIBAYAR LUNAS</p>
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                       <p className="text-[10px] text-slate-400 font-mono break-all">Sender: {newPayment?.sender?.substring(0,20)}...</p>
+                    </div>
+                 </div>
+
+                 <button 
+                  onClick={() => setShowOverlay(false)}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition transform active:scale-95"
+                 >
+                   MANTAP! (Tutup)
+                 </button>
+              </div>
+
+              {/* Success Confetti Effect (Simple CSS) */}
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-20">
+                 {[...Array(6)].map((_, i) => (
+                    <div key={i} className={`absolute w-4 h-4 rounded-sm animate-ping bg-blue-500`} style={{ top: `${Math.random()*100}%`, left: `${Math.random()*100}%`, animationDelay: `${i*0.5}s` }}></div>
+                 ))}
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="text-center pt-8 opacity-40">
         <button onClick={() => {
             localStorage.removeItem('merchant_id'); 

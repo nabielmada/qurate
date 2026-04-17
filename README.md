@@ -93,10 +93,29 @@ The `PayAIRouter.sol` contract serves as the trustless settlement layer.
 
 ---
 
-## 🗺️ Roadmap (Post-Hackathon)
-- [ ] **L2 Native Settlement**: Deeper integration with Base/Polygon for sub-second finality.
-- [ ] **Account Abstraction (ERC-4337)**: AI Agent with its own smart wallet for true "Zero-Input" payments.
-- [ ] **Mobile App**: Native iOS/Android via Flutter.
+## 🧠 Project Philosophy: Technical Depth & Decisions
+
+During this hackathon sprint, we prioritized **User Experience (UX)** and **Transaction Speed**. Below is our reasoning for certain architectural choices:
+
+### 1. The "1-Click" vs "2-Step" ERC20 Dilemma
+In a production environment, paying with ERC20 (USDC/USDT) requires two on-chain signatures: `Approve` and `Transfer`. This creates friction. For this MVP, we focus on **Native Settlement (Base ETH)** to demonstrate the **Atomic "1-Click" Scan-to-Pay** flow. In our production roadmap, we intend to use **Permit2** or **Account Abstraction Session Keys** to bundle these into a single signature.
+
+### 2. Cross-Chain Routing Simulation
+While our AI correctly identifies assets on Arbitrum or Polygon, "bridging" them to Base real-time can take 2-5 minutes. For demo purposes, we simulate the settlement to show the **Instant UX** we aim for. Our code is architected to integrate with **Li.Fi SDK** or **LayerZero** to handle these bridges asynchronously in the background in future versions.
+
+### 3. Real-time Merchant Settlement
+We leverage **Wagmi Event Watchers** on the Merchant Dashboard. This ensures that the moment a block is confirmed on Base, the Merchant's UI reacts instantly without a page refresh, providing a "Web2-like" responsiveness for a Web3 transaction.
+
+---
+
+## 🗺️ Roadmap & Future Architecture
+- [x] **Account Abstraction (Smart Wallets)**: Implemented WebAuthn & Passkeys via Coinbase Smart Wallet SDK. Users can pay without installing extensions — just a thumbprint away.
+- [x] **Real-time Event Notifications**: Merchant Dashboard automatically detects incoming payments via On-Chain events.
+- [ ] **On-Chain KYC / AML Compliance Framework**: 
+  - *Merchant KYC*: Integration with Web3 identity verifiable credentials (e.g., Coinbase Verifications or Polygon ID).
+  - *Real-time User AML*: Screening payer addresses via Chainalysis API.
+- [ ] **Fully Autonomous Session Keys**: AI Agent pays trusted merchants automatically up to a daily limit.
+- [ ] **Native Mobile App**: Migration to Flutter for native NFC and specialized scanner support.
 
 ---
 
