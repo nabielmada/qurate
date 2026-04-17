@@ -11,7 +11,7 @@
 ## 🌟 Vision
 **Qurate** is an AI-driven Web3 payment platform that enables anyone to pay with crypto just by scanning a static QR code — without needing to understand tokens, chains, gas fees, or complex routing.
 
-Our AI Agent automatically scans the user's wallet, evaluates multiple routes, selects the most optimal token and chain, executes the transaction with **fallback routing** mechanisms, and explains its reasoning through **comparative natural language** (Bahasa Indonesia).
+Our AI Agent automatically scans the user's wallet, evaluates multiple routes, selects the most optimal token and chain, executes the transaction with **fallback routing** mechanisms, and explains its reasoning through **comparative natural language** (English).
 
 ---
 
@@ -26,7 +26,7 @@ Unlike traditional Web3 payment gateways where users must manually select assets
 
 ### 2. Comparative Reasoning Explainer (Gemini 1.5 Flash)
 Every transaction decision is narrated by **Google Gemini 1.5 Flash**. Upgraded from simple narration, the AI provides **comparative reasoning** — explaining *why* it chose the winning route and *why* it rejected the others:
-> *"Rute USDT di Polygon dipilih karena biaya adminnya paling rendah (Rp 150) dan masuk kategori tabungan stabil. Sebaliknya, rute Ethereum diabaikan karena biayanya luar biasa mahal mencapai Rp 50.000."*
+> *"The USDT route on Polygon was chosen because it has the lowest fee ($0.01) and qualifies as a stable savings category. Conversely, the Ethereum route was ignored because its fee is incredibly high, reaching $3.50."*
 
 ### 3. Automated Fallback Safety
 If the primary selected route fails (e.g., wallet RPC issue, node failure, or user rejection), the AI Agent automatically falls back to the #2 alternative in the decision matrix to ensure the payment successfully settles.

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Qurate — AI-Powered Web3 Payment Agent",
-  description: "Bayar dengan crypto semudah scan QR. AI Agent kami memilih token, chain (L2), dan rute termurah dangan transparansi penuh.",
+  description: "Pay with crypto as easily as scanning a QR code. Our AI Agent selects the cheapest tokens, chains (L2), and routes with full transparency.",
   openGraph: {
     title: "Qurate — AI-Powered Web3 Payment Agent",
     description: "The first truly autonomous AI payment agent for Web3. Multichain, Gasless focus, and Explainable AI.",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Qurate — AI-Powered Web3 Payment Agent",
-    description: "Bayar semudah scan QR. Biarkan AI yang mengurus teknis Blockchain-nya.",
+    description: "Pay as easily as scanning a QR. Let AI handle the heavy blockchain technicals for you.",
   }
 };
 

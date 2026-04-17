@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { apiUrl } from '@/lib/api';
 import { CheckCircle2, ShieldAlert, Sparkles, X } from 'lucide-react';
 
-// Static ABI and Contract specifically for this routing scenario
+// Static ABI and Contract configuration for the routing protocol
 const CONTRACT_ADDRESS = "0xeEe66cBe7aF484A0736e691bf94682Ef95aF50bE" as `0x${string}`;
 const PayAIRouterABI = [
   {
@@ -51,7 +51,19 @@ const PayAIRouterABI = [
 // Helper to format Date
 const formatTime = (dateStr: string) => {
   const d = new Date(dateStr);
-  return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+};
+
+// Helper for currency symbols
+const getCurrencySymbol = (currency: string) => {
+  const symbols: Record<string, string> = {
+    IDR: 'Rp',
+    USD: '$',
+    MYR: 'RM',
+    SGD: 'S$',
+    EUR: '€',
+  };
+  return symbols[currency?.toUpperCase()] || currency;
 };
 
 export default function MerchantDashboard() {
@@ -68,8 +80,9 @@ export default function MerchantDashboard() {
   // Realtime Data State
   const [dbTransactions, setDbTransactions] = useState<any[]>([]);
   const [totalIdr, setTotalIdr] = useState<number>(0);
+  const [rates, setRates] = useState<Record<string, number>>({ IDR: 16000, USD: 1, MYR: 4.7, SGD: 1.35, EUR: 0.94 });
   const [favoriteToken, setFavoriteToken] = useState<string>('-');
-  const [aiInsight, setAiInsight] = useState<string>('Menganalisa data transaksi...');
+  const [aiInsight, setAiInsight] = useState<string>('Analyzing transaction data...');
   
   // Real-time Notification State
   const [newPayment, setNewPayment] = useState<any | null>(null);
@@ -112,11 +125,11 @@ export default function MerchantDashboard() {
       });
       setTxHash(hash);
     } catch (e) {
-      console.error("Gagal sinkronisasi blockchain:", e);
+      console.error("Blockchain synchronization failed:", e);
     }
   };
 
-  // 1. Real-time On-Chain Watcher
+  // 1. Real-time On-Chain Watcher - Monitors contract events for successful settlement
   useWatchContractEvent({
     address: CONTRACT_ADDRESS,
     abi: PayAIRouterABI,
@@ -131,7 +144,7 @@ export default function MerchantDashboard() {
           });
           setShowOverlay(true);
           
-          // Play sound (Optional browser behavior)
+          // Play sound (Standard retail alert behavior)
           try {
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3');
             audio.play();
@@ -166,7 +179,7 @@ export default function MerchantDashboard() {
         if (data.success) {
           setMerchantData(data.merchant);
         } else {
-          // invalid ID
+          // Invalid or expired session
           localStorage.removeItem('merchant_id');
           router.push('/merchant/register');
         }
@@ -186,7 +199,18 @@ export default function MerchantDashboard() {
       return txDate.getDate() === now.getDate() && txDate.getMonth() === now.getMonth();
     });
     
-    const sumIdr = todayTxs.reduce((acc, curr) => acc + Number(curr.amount_idr || 0), 0);
+    const sumIdr = todayTxs.reduce((acc, curr) => {
+      const txAmount = Number(curr.amount_idr || 0);
+      const txCurrency = curr.currency || 'IDR';
+      
+      if (txCurrency === 'IDR') return acc + txAmount;
+      
+      const rateAsal = rates[txCurrency.toUpperCase()] || 1;
+      const rateIdr = rates['IDR'] || 16000;
+      const converted = (txAmount / rateAsal) * rateIdr;
+      
+      return acc + converted;
+    }, 0);
     setTotalIdr(sumIdr);
 
     const tokenCounts: Record<string, number> = {};
@@ -207,7 +231,7 @@ export default function MerchantDashboard() {
 
   const generateInsight = (txs: any[], todaySumIdr: number) => {
     if (txs.length === 0) {
-      setAiInsight("Belum ada data transaksi yang cukup untuk dianalisa.");
+      setAiInsight("Insufficient transaction data for AI analysis.");
       return;
     }
     
@@ -216,40 +240,49 @@ export default function MerchantDashboard() {
 
     const hours = txs.map(t => t.created_at ? new Date(t.created_at).getHours() : -1).filter(h => h !== -1);
     
-    let timeRange = "sepanjang hari";
+    let timeRange = "throughout the day";
     if (hours.length > 0) {
       const hourCounts: Record<number, number> = {};
       hours.forEach(h => hourCounts[h] = (hourCounts[h] || 0) + 1);
       const sortedHours = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
       const peakHour = Number(sortedHours[0][0]);
-      timeRange = `sekitar jam ${peakHour}:00 - ${peakHour+2}:00 WIB`;
+      timeRange = `around ${peakHour}:00 - ${peakHour+2}:00`;
     }
 
     const pairCounts: Record<string, number> = {};
     txs.forEach(t => {
-       const pair = `${t.token_symbol || 'Token'} di jaringan ${t.chain || 'Base'}`;
+       const pair = `${t.token_symbol || 'Token'} on ${t.chain || 'Base'} network`;
        pairCounts[pair] = (pairCounts[pair] || 0) + 1;
     });
     const sortedPairs = Object.entries(pairCounts).sort((a,b)=>b[1]-a[1]);
-    const topPair = sortedPairs.length > 0 ? sortedPairs[0][0] : 'USDC di Base';
+    const topPair = sortedPairs.length > 0 ? sortedPairs[0][0] : 'USDC on Base';
     
-    setAiInsight(`Pelanggan sering berbelanja ${timeRange}. Mayoritas dominan menggunakan ${topPair} mengingat biaya / kenyamanannya. Rata-rata ukuran keranjang belanja per struk adalah Rp ${avg.toLocaleString('id-ID')}.`);
+    setAiInsight(`Customers frequently scan ${timeRange}. most predominantly using ${topPair} given the low fees and convenience. The average basket size per transaction is ${avg.toLocaleString('en-US')}.`);
   };
 
   useEffect(() => {
     if (!merchantId) return;
 
     const fetchHistory = async () => {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('merchant_id', merchantId)
-        .order('created_at', { ascending: false })
-        .limit(20);
-        
-      if (!error && data) {
-        setDbTransactions(data);
-        calculateStats(data);
+      try {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('*')
+          .eq('merchant_id', merchantId)
+          .order('created_at', { ascending: false })
+          .limit(20);
+          
+        if (!error && data) {
+          setDbTransactions(data);
+          calculateStats(data);
+        }
+
+        // Fetch latest rates for conversion
+        const ratesRes = await fetch(apiUrl('/rates'));
+        const ratesData = await ratesRes.json();
+        if (ratesData) setRates(ratesData);
+      } catch (err) {
+        console.error("Data fetch failed:", err);
       }
     };
     
@@ -312,11 +345,11 @@ export default function MerchantDashboard() {
             <div className="flex items-center gap-3 mb-2">
                <h1 className="text-3xl font-black text-slate-900 tracking-tight">{merchantData.name}</h1>
                {isRegisteredOnChain ? (
-                 <span className="bg-emerald-100 text-emerald-700 p-1.5 rounded-full shadow-sm" title="On-Chain Sync Selesai">
+                 <span className="bg-emerald-100 text-emerald-700 p-1.5 rounded-full shadow-sm" title="On-Chain Sync Complete">
                    <CheckCircle2 size={16} />
                  </span>
                ) : (
-                 <span className="bg-amber-100 text-amber-700 p-1.5 rounded-full shadow-sm" title="Belum Sinkronisasi Blockchain">
+                 <span className="bg-amber-100 text-amber-700 p-1.5 rounded-full shadow-sm" title="Blockchain Sync Required">
                    <ShieldAlert size={16} />
                  </span>
                )}
@@ -329,8 +362,8 @@ export default function MerchantDashboard() {
           {/* Stats Cards Dynamic */}
           <div className="flex flex-wrap gap-4 w-full md:w-auto">
             <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex-1 md:min-w-[140px] shadow-sm">
-              <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Total Hari Ini</p>
-              <p className="text-2xl font-black text-blue-900">Rp {(totalIdr / 1000).toLocaleString('id-ID')}Rb</p>
+              <p className="text-xs text-blue-600 font-bold uppercase tracking-wider mb-1">Today's Total</p>
+              <p className="text-2xl font-black text-blue-900">{(totalIdr / 1000).toLocaleString('en-US')}K</p>
             </div>
             <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl flex-1 md:min-w-[140px] shadow-sm">
               <p className="text-xs text-emerald-600 font-bold uppercase tracking-wider mb-1">Total TX</p>
@@ -349,12 +382,12 @@ export default function MerchantDashboard() {
              <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
                 <svg className="w-40 h-40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13h-13L12 6.5z"/></svg>
              </div>
-             <div className="relative z-10 w-full md:w-auto flex-1">
-               <h3 className="text-xl font-bold text-amber-900 mb-2 flex items-center gap-2"> Sinkronisasi Blockchain Diperlukan!</h3>
-               <p className="text-amber-800 text-sm font-medium leading-relaxed max-w-2xl">
-                 Toko Anda tercatat di Supabase, namun untuk dapat menerima pembayaran kripto langsung, ID Toko Anda perlu didaftarkan di dalam Smart Contract (Base Network). Ini menjamin dana akan masuk langsung ke dompet Anda tanpa perantara.
-               </p>
-             </div>
+              <div className="relative z-10 w-full md:w-auto flex-1">
+                <h3 className="text-xl font-bold text-amber-900 mb-2 flex items-center gap-2"> Blockchain Synchronization Required!</h3>
+                <p className="text-amber-800 text-sm font-medium leading-relaxed max-w-2xl">
+                  Your shop is registered in the database, but to receive direct crypto payments, your Shop ID needs to be registered on the Smart Contract (Base Network). This ensures funds go directly to your wallet without intermediaries.
+                </p>
+              </div>
              <div className="relative z-10 flex border-2 border-transparent">
                {!isConnected ? (
                  <ConnectButton />
@@ -367,9 +400,9 @@ export default function MerchantDashboard() {
                        ? 'bg-amber-200 text-amber-600 cursor-not-allowed shadow-none' 
                        : 'bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-500/30'
                    }`}
-                 >
-                   {isPending ? 'Konfirmasi di Wallet...' : isSyncing ? 'Merekam di Blockchain...' : 'Sync Data Sekarang ✨'}
-                 </button>
+                  >
+                    {isPending ? 'Confirming in Wallet...' : isSyncing ? 'Recording on Blockchain...' : 'Sync Data Now ✨'}
+                  </button>
                )}
              </div>
           </div>
@@ -397,7 +430,7 @@ export default function MerchantDashboard() {
             {activeTab === 'dynamic' ? (
               <div className="space-y-5 animate-fade-in flex-1">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Tagihan Dinamis (Rp)</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Dynamic Bill (Amount)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-slate-400 font-bold">Rp</span>
                     <input 
@@ -409,11 +442,11 @@ export default function MerchantDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Preferensi Token Kasir</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Checkout Token Preference</label>
                   <select className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl p-3 text-sm font-bold text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none appearance-none transition">
-                    <option value="ANY">Serahkan Keputusan Pada AI</option>
-                    <option value="USDC">Hanya Menerima USDC</option>
-                    <option value="USDT">Hanya Menerima USDT</option>
+                    <option value="ANY">Let the AI Decide</option>
+                    <option value="USDC">Only Accept USDC</option>
+                    <option value="USDT">Only Accept USDT</option>
                   </select>
                 </div>
                 <button 
@@ -429,7 +462,7 @@ export default function MerchantDashboard() {
             ) : (
               <div className="text-center py-6 animate-fade-in space-y-4 flex-1 flex flex-col justify-center">
                 <StaticMerchantQR merchantId={merchantId} merchantName={merchantData.name} />
-                <p className="text-sm text-slate-500">Cetak QR ini dan tempel di meja kasir. Customer akan menginput nominal sendiri dan AI akan mengkalkulasinya.</p>
+                <p className="text-sm text-slate-500">Print this QR and place it at the counter. Customers will input the amount manually and the AI will handle the conversion.</p>
                 <button 
                   onClick={() => {
                     const canvas = document.querySelector('#static-qr-canvas') as HTMLCanvasElement;
@@ -466,29 +499,32 @@ export default function MerchantDashboard() {
           {/* Right Panel: TRANSACTIONS TABLE */}
           <div className="col-span-1 lg:col-span-2 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col">
             <div className="flex justify-between items-end mb-6">
-              <h2 className="text-xl font-bold text-slate-800">Riwayat Pembayaran</h2>
-              <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition">Lihat Semua →</button>
+              <h2 className="text-xl font-bold text-slate-800">Payment History</h2>
+              <button className="text-sm font-bold text-blue-600 hover:text-blue-800 transition">View All →</button>
             </div>
             
             <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-400 text-xs uppercase tracking-widest bg-slate-100/50">
-                    <th className="p-4 font-bold">Waktu</th>
-                    <th className="p-4 font-bold">Nominal (IDR)</th>
-                    <th className="p-4 font-bold">Dana Masuk</th>
+                    <th className="p-4 font-bold">Time</th>
+                    <th className="p-4 font-bold">Amount</th>
+                    <th className="p-4 font-bold">Funds Received</th>
                     <th className="p-4 font-bold">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {dbTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-slate-500 font-medium">Menunggu pelanggan pertama hari ini...</td>
+                      <td colSpan={4} className="p-8 text-center text-slate-500 font-medium">Waiting for the first customer of the day...</td>
                     </tr>
                   ) : dbTransactions.map((tx, index) => (
                     <tr key={tx.id || index} className={`hover:bg-white transition group ${index === 0 ? 'bg-emerald-50/50' : 'bg-slate-50'}`}>
-                      <td className="p-4 font-medium text-sm text-slate-500">{tx.created_at ? formatTime(tx.created_at) : '-'} WIB</td>
-                      <td className="p-4 font-black text-lg text-slate-900">Rp {Number(tx.amount_idr).toLocaleString('id-ID')}</td>
+                      <td className="p-4 font-medium text-sm text-slate-500">{tx.created_at ? formatTime(tx.created_at) : '-'}</td>
+                      <td className="p-4 font-black text-lg text-slate-900">
+                        <span className="text-xs font-bold text-slate-400 mr-1">{getCurrencySymbol(tx.currency)}</span>
+                        {Number(tx.amount_idr).toLocaleString('en-US')}
+                      </td>
                       <td className="p-4">
                         <div className="flex flex-col">
                           <span className="font-bold text-blue-600 text-sm">{tx.token_symbol || 'ETH'}</span>
@@ -498,7 +534,7 @@ export default function MerchantDashboard() {
                       <td className="p-4">
                         <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5">
                           <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                          Sukses
+                          Success
                         </span>
                       </td>
                     </tr>
@@ -513,7 +549,7 @@ export default function MerchantDashboard() {
                 <svg className="w-48 h-48" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 4.5l6.5 13h-13L12 6.5z"/></svg>
               </div>
               <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-3 text-lg">
-                <span className="text-2xl bg-white p-2 rounded-xl shadow-sm text-blue-600">✨</span> Laporan Intelijen AI
+                <span className="text-2xl bg-white p-2 rounded-xl shadow-sm text-blue-600">✨</span> AI Intelligence Report
               </h3>
               <p className="text-sm font-medium text-blue-800 leading-relaxed max-w-2xl">
                 {aiInsight}
@@ -544,24 +580,24 @@ export default function MerchantDashboard() {
                     </div>
                  </div>
 
-                 <div>
+                  <div>
                     <h2 className="text-3xl font-black text-slate-900 mb-2">BINGGO! 💰</h2>
-                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Pembayaran Baru Diterima</p>
-                 </div>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">New Payment Received</p>
+                  </div>
 
-                 <div className="bg-slate-50 w-full p-6 rounded-3xl border-2 border-slate-100">
-                    <p className="text-xs text-slate-400 font-bold uppercase mb-1">Status Blokir (Atomik)</p>
-                    <p className="text-2xl font-black text-emerald-600">DIBAYAR LUNAS</p>
+                  <div className="bg-slate-50 w-full p-6 rounded-3xl border-2 border-slate-100">
+                    <p className="text-xs text-slate-400 font-bold uppercase mb-1">Blockchain Status (Atomic)</p>
+                    <p className="text-2xl font-black text-emerald-600">PAID IN FULL</p>
                     <div className="mt-4 pt-4 border-t border-slate-200">
                        <p className="text-[10px] text-slate-400 font-mono break-all">Sender: {newPayment?.sender?.substring(0,20)}...</p>
                     </div>
                  </div>
 
-                 <button 
+                  <button 
                   onClick={() => setShowOverlay(false)}
                   className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-500/30 transition transform active:scale-95"
                  >
-                   MANTAP! (Tutup)
+                   GREAT! (Close)
                  </button>
               </div>
 

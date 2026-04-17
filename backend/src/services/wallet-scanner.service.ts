@@ -19,7 +19,7 @@ export class WalletScannerService {
   }
 
   async scanWallet(walletAddress: string): Promise<TokenBalance[]> {
-    // 1. Khusus untuk Guest Mode (Demo)
+    // 1. Handling for Guest Mode (Demo)
     if (walletAddress === '0xGUEST') {
       return [
         { symbol: 'ETH', chain: 'Ethereum', balance: 0.1245, usdValue: 435.75, priceUsd: 3500 },
@@ -30,13 +30,13 @@ export class WalletScannerService {
       ];
     }
 
-    // 2. Terima wallet address & error handling
+    // 2. Wallet address validation and error handling
     if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-      throw new HttpException('Format wallet address tidak valid', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Invalid wallet address format', HttpStatus.BAD_REQUEST);
     }
 
     if (!this.apiKey) {
-      console.warn('ALCHEMY_API_KEY belum dikonfigurasi di .env!');
+      console.warn('ALCHEMY_API_KEY not configured in .env!');
     }
 
     const allTokens: TokenBalance[] = [];
@@ -46,7 +46,7 @@ export class WalletScannerService {
     // Fetch real-time prices
     const tokenPrices = await this.currencyService.getTokenPrices(coingeckoIds);
 
-    // 2. Fetch ke semua chain secara paralel
+    // 2. Parallel fetch across all supported chains
     await Promise.all(
       chains.map(async (chain) => {
         try {
@@ -102,12 +102,12 @@ export class WalletScannerService {
 
           const tokenBalances = data.result?.tokenBalances || [];
 
-          // Filter saldo 0
+          // Filter zero balances
           const activeBalances = tokenBalances.filter(
             (token: any) => token.tokenBalance !== '0x0000000000000000000000000000000000000000000000000000000000000000'
           );
 
-          // Get metadata untuk mendapatkan symbol & konversi desimal secara paralel
+          // Get metadata and convert decimals in parallel
           await Promise.all(activeBalances.map(async (token: any) => {
             try {
               const metaResponse = await fetch(url, {
@@ -128,7 +128,7 @@ export class WalletScannerService {
                 const rawBalance = BigInt(token.tokenBalance).toString();
                 const balance = Number(rawBalance) / Math.pow(10, decimals);
 
-                // Kalkulasi usdValue
+                // Calculate usdValue
                 let usdValue = 0;
                 const upperSymbol = symbol.toUpperCase();
                 
@@ -169,10 +169,10 @@ export class WalletScannerService {
       return !isSpam && (isTestnet ? t.balance > 0 : t.usdValue > 0.1);
     });
 
-    // Urutkan berdasarkan nilai USD tertinggi
+    // Sort by highest USD value
     filteredTokens.sort((a, b) => b.usdValue - a.usdValue);
 
-    // Ambil Top 8 saja agar UI tetap bersih
+    // Take Top 8 only to keep UI clean
     const topTokens = filteredTokens.slice(0, 8);
 
     return topTokens;

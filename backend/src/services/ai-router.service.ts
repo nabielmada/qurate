@@ -44,7 +44,7 @@ export class AiRouterService {
     this.alchemyKey = process.env.ALCHEMY_API_KEY || '';
   }
 
-  // Estimasi standar kecepatan konfirmasi block (dalam detik)
+  // Estimated standard block confirmation speed (in seconds)
   private readonly SPEEDS = {
     'Base': 2,
     'Base Sepolia': 2,
@@ -55,9 +55,9 @@ export class AiRouterService {
   };
 
   /**
-   * 1. Fungsi getGasPrices()
-   * Fetch gas price real-time from Alchemy RPC
-   * Returns gas fee in the requested currency
+   * 1. getGasPrices() method
+   * Fetch real-time gas prices from Alchemy RPC
+   * Returns gas fee in the requested target currency
    */
   async getGasPrices(targetCurrency: string = 'USD'): Promise<Record<string, number>> {
     // Return cached result if still fresh
@@ -161,41 +161,43 @@ export class AiRouterService {
     stableBonus: number;
     liquidityScore: number;
   } {
-    // Threshold efisiensi gas dlm USD: Kita anggap $2.00 adalah batas "mahal"
-    const gasEfficiency = Math.max(0, 1 - (gasPriceUsd / 2.0));
+    /**
+     * @dev Composite Scoring Algorithm: Multi-variable optimization
+     * Weights: Gas (40%), Speed (30%), Stability (20%), Liquidity (10%)
+     * Normalizes heterogeneous chain data into a unified Decision Matrix.
+     */
+    const gasEfficiency = Math.max(0, 1 - (gasPriceUsd / 2.0)); // Threshold: $2.00 is high-risk/premium
     
-    // Asumsi speed paling lambat yg ditoleransi = 15 detik
-    const speedScore = Math.max(0, 1 - (speed / 15));
+    const speedScore = Math.max(0, 1 - (speed / 15)); // Tolerance: 15s max for retail POS scenarios
     
-    // Stable Bonus: USDC/USDT adalah settlement ideal untuk payment (skor 1.0)
+    // Stable Bonus: Incentivizes low-volatility assets (USDC/USDT) for merchant settlement
     const stableBonus = (token === 'USDC' || token === 'USDT') ? 1.0 : 0.2;
     
-    // Liquidity score default 1.0 untuk token-token dominan
-    const liquidityScore = 1.0;
+    const liquidityScore = 1.0; // Default for major blue-chip tokens
 
-    // Formula komposit: weighted multi-variable optimization
+    // Composite formula for AI route selection
     const total = (0.4 * gasEfficiency) + (0.3 * speedScore) + (0.2 * stableBonus) + (0.1 * liquidityScore);
     
     return { total, gasEfficiency, speedScore, stableBonus, liquidityScore };
   }
 
   /**
-   * 3. Fungsi findOptimalRoute(walletTokens, amount, currency)
+   * 3. findOptimalRoute(walletTokens, amount, currency) method
    * Returns the best route AND all evaluated candidates with score breakdowns
    */
   async findOptimalRoute(walletTokens: TokenBalance[], amount: number, currency: string = 'USD'): Promise<RouteResult | null> {
-    // 1. Convert amount request ke USD pivot (PENTING: Selalu hitung buffer dalam USD)
+    // 1. Convert requested amount to USD pivot (IMPORTANT: Always calculate buffer in USD)
     const amountUSD = await this.currencyService.convertToUSD(amount, currency);
     const minRequiredUSD = amountUSD * 1.05; 
     
-    // 2. Filter token yang balance cukup
+    // 2. Filter tokens with sufficient balance
     const eligibleTokens = walletTokens.filter(t => t.usdValue >= minRequiredUSD);
 
     if (eligibleTokens.length === 0) {
       return null;
     }
 
-    // 3. Ambil data gas dalam currency yang diminta
+    // 3. Fetch gas data in the requested target currency
     const gasPricesTarget = await this.getGasPrices(currency);
     const idrRates = await this.currencyService.getLatestRates();
     const targetToUsdRate = 1 / (idrRates[currency.toUpperCase()] || 1);
@@ -207,13 +209,13 @@ export class AiRouterService {
       const gPriceTarget = gasPricesTarget[token.chain] || (currency === 'USD' ? 0.05 : 500);
       const speed = this.SPEEDS[token.chain as keyof typeof this.SPEEDS] || 15;
       
-      // Hitung Gas dlm USD untuk scoring yang adil
+      // Calculate Gas in USD for fair scoring
       const gPriceUsd = gPriceTarget * targetToUsdRate;
 
-      // Hitung amountToken: USD_Amount / USD_per_Token
+      // Calculate amountToken: USD_Amount / USD_per_Token
       const amountToken = amountUSD / token.priceUsd;
 
-      // Scoring menggunakan USD base ($2.00 threshold)
+      // Scoring using USD base ($2.00 threshold)
       const scoreResult = this.calculateScore(token.symbol, token.chain, gPriceUsd, speed);
       
       candidates.push({

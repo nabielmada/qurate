@@ -67,7 +67,7 @@ export default function RegisterMerchantPage() {
       const data = await res.json();
       
       if (!data.success) {
-        throw new Error('Merchant ID tidak ditemukan. Periksa kembali ID Anda.');
+        throw new Error('Merchant ID not found. Please check your ID again.');
       }
 
       localStorage.setItem('merchant_id', data.merchant.id);
@@ -90,8 +90,8 @@ export default function RegisterMerchantPage() {
           <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
             <Store size={32} />
           </div>
-          <h1 className="text-2xl font-black text-slate-900">Portal Merchant</h1>
-          <p className="text-slate-500 font-medium text-sm mt-2">Masuk atau daftarkan toko Anda untuk akses Qurate.</p>
+          <h1 className="text-2xl font-black text-slate-900">Merchant Portal</h1>
+          <p className="text-slate-500 font-medium text-sm mt-2">Login or register your shop to access Qurate.</p>
         </div>
 
         {/* Tabs */}
@@ -100,13 +100,13 @@ export default function RegisterMerchantPage() {
             onClick={() => { setMode('register'); setError(null); }}
             className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${mode === 'register' ? 'bg-white text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Daftar Baru
+            Register New
           </button>
           <button 
             onClick={() => { setMode('login'); setError(null); }}
             className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${mode === 'login' ? 'bg-white text-blue-600 shadow' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            Masuk Kios
+            Terminal Login
           </button>
         </div>
 
@@ -120,7 +120,7 @@ export default function RegisterMerchantPage() {
         {mode === 'register' ? (
           <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Nama Toko</label>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Shop Name</label>
               <div className="relative">
                 <span className="absolute left-4 top-3.5 text-slate-400"><Store size={18} /></span>
                 <input 
@@ -128,14 +128,14 @@ export default function RegisterMerchantPage() {
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
                   required
-                  placeholder="Contoh: Coffee Shop Jakarta"
+                  placeholder="Example: Jakarta Coffee Shop"
                   className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl p-3 pl-12 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none transition placeholder-slate-400"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Alamat Dompet Penerima (Wallet)</label>
+              <label className="block text-sm font-bold text-slate-700 mb-2">Settlement Wallet Address</label>
               <div className="relative">
                 <span className="absolute left-4 top-3.5 text-slate-400"><Wallet size={18} /></span>
                 <input 
@@ -149,7 +149,7 @@ export default function RegisterMerchantPage() {
               </div>
               {address && walletAddress === address && (
                 <p className="text-xs text-emerald-600 font-bold mt-2 flex items-center gap-1">
-                  <CheckCircle2 size={14} /> Terhubung dan terisi otomatis
+                  <CheckCircle2 size={14} /> Connected and auto-filled
                 </p>
               )}
             </div>
@@ -164,10 +164,10 @@ export default function RegisterMerchantPage() {
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                  Memproses...
+                  Processing...
                 </span>
               ) : (
-                <>Daftar & Klaim ID <ArrowRight size={18} /></>
+                <>Register & Claim ID <ArrowRight size={18} /></>
               )}
             </button>
           </form>
@@ -182,7 +182,7 @@ export default function RegisterMerchantPage() {
                   value={loginId}
                   onChange={(e) => setLoginId(e.target.value)}
                   required
-                  placeholder="Contoh: m_ad2d9e45"
+                  placeholder="Example: m_ad2d9e45"
                   className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl p-3 pl-12 text-sm font-semibold text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none transition placeholder-slate-400 font-mono"
                 />
               </div>
@@ -198,10 +198,10 @@ export default function RegisterMerchantPage() {
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
-                  Mencari Data...
+                  Finding Data...
                 </span>
               ) : (
-                <>Masuk ke Dashboard <ArrowRight size={18} /></>
+                <>Enter Dashboard <ArrowRight size={18} /></>
               )}
             </button>
           </form>
@@ -209,7 +209,7 @@ export default function RegisterMerchantPage() {
       </div>
 
       <button onClick={() => router.push('/')} className="mt-8 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-slate-800 transition">
-        ← Kembali ke Beranda
+        ← Back to Home
       </button>
     </div>
   );

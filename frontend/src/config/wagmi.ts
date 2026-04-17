@@ -3,6 +3,11 @@ import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from '@rainbow-me
 import { baseSepolia } from 'wagmi/chains';
 import { http } from 'wagmi';
 
+/** 
+ * @dev Account Abstraction (ERC-4337) Integration
+ * Setup: Coinbase Smart Wallet with 'smartWalletOnly' preference.
+ * Enables Passkey/Biometric authentication for zero-friction Web3 onboarding.
+ */
 coinbaseWallet.preference = 'smartWalletOnly';
 
 export const config = getDefaultConfig({

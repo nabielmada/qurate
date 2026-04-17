@@ -15,9 +15,10 @@ export class AiExplainerService {
   }
 
   /**
-   * Panggil Google Gemini API
-   * Generate human-readable COMPARATIVE reasoning — explain why winner was chosen
-   * AND why other routes were rejected
+   * @dev Google Gemini 1.5/2.0 Flash Integration
+   * Logic: Generates human-readable COMPARATIVE reasoning.
+   * Unlike standard narrators, this explains the 'Winning Route' vs 'Rejected Routes' 
+   * to build trust through transparency.
    */
   async explainDecision(
     routeData: RouteData,
@@ -29,14 +30,14 @@ export class AiExplainerService {
     const symbol = this.currencyService.getSymbol(currency);
 
     if (!this.client) {
-      console.warn('GEMINI_API_KEY tidak dikonfigurasi. Menggunakan fallback lokal.');
-      return `Saya merekomendasikan menggunakan ${routeData.token} di jaringan ${routeData.chain}. Biayanya sangat murah dan prosesnya cepat!`;
+      console.warn('GEMINI_API_KEY not configured. Using local fallback.');
+      return `I recommend using ${routeData.token} on the ${routeData.chain} network. The fees are extremely low and the process is fast!`;
     }
 
     try {
       // Build comparative route table for Gemini
       const formatVal = (v: number) => {
-        return v.toLocaleString(currency === 'IDR' ? 'id-ID' : 'en-US', {
+        return v.toLocaleString('en-US', {
           maximumFractionDigits: currency === 'IDR' ? 0 : 2,
           minimumFractionDigits: currency === 'IDR' ? 0 : 2
         });
@@ -45,31 +46,31 @@ export class AiExplainerService {
       let routeComparisonBlock = '';
       if (candidates.length > 1) {
         const routeLines = candidates.map((c, i) => {
-          const tag = i === 0 ? '(DIPILIH ✓)' : `(Alternatif ${i})`;
-          return `  - Rute ${i + 1} ${tag}: ${c.token} / ${c.chain} — Biaya ${symbol} ${formatVal(c.gasEstimateIdr)}, Skor ${(c.score * 100).toFixed(0)}%`;
+          const tag = i === 0 ? '(SELECTED ✓)' : `(Alternative ${i})`;
+          return `  - Route ${i + 1} ${tag}: ${c.token} / ${c.chain} — Fee ${symbol} ${formatVal(c.gasEstimateIdr)}, Score ${(c.score * 100).toFixed(0)}%`;
         }).join('\n');
         routeComparisonBlock = `
-        Semua Rute yang Dievaluasi AI (${candidates.length} rute):
+        All AI Evaluated Routes (${candidates.length} routes):
 ${routeLines}
         `;
       }
 
       const prompt = `
-        Konteks: Aplikasi Pembayaran Web3 bernama Qurate AI.
-        Tugas: Jelaskan mengapa AI memilih rute pembayaran ini kepada pengguna awam. Bandingkan dengan rute lain yang dievaluasi.
+        Context: A Web3 Payment Application called Qurate AI.
+        Task: Explain why the AI chose this specific payment route to a non-technical user. Compare it with other evaluated routes.
         
-        Data Transaksi:
-        - Pelanggan membayar ${symbol} ${formatVal(amount)} ke merchant "${merchantName}".
-        - Strategi terpilih: Token ${routeData.token} di network ${routeData.chain}.
-        - Estimasi biaya admin/gas: ${symbol} ${formatVal(routeData.gasEstimateIdr)}.
-        - Skor efisiensi AI: ${(routeData.score * 100).toFixed(0)}%.
+        Transaction Data:
+        - Customer is paying ${symbol} ${formatVal(amount)} to merchant "${merchantName}".
+        - Selected strategy: ${routeData.token} token on ${routeData.chain} network.
+        - Estimated transaction/gas fees: ${symbol} ${formatVal(routeData.gasEstimateIdr)}.
+        - AI efficiency score: ${(routeData.score * 100).toFixed(0)}%.
         ${routeComparisonBlock}
-        Instruksi:
-        1. Gunakan Bahasa Indonesia yang ramah (human-first).
-        2. Maksimal 3-4 kalimat.
-        3. Jelaskan MENGAPA rute ini dipilih DAN mengapa rute lain tidak dipilih (sebutkan perbandingan biaya/kecepatan).
-        4. Jangan gunakan istilah teknis (gas, chain, liquidity, score). Ganti dengan kata sederhana seperti "biaya admin", "jalur", "tabungan digital".
-        5. Jangan beri salam pembuka.
+        Instructions:
+        1. Use friendly, human-first English.
+        2. Maximum 3-4 sentences.
+        3. Explain WHY this route was chosen AND why others were rejected (mention fee/speed comparison).
+        4. Avoid technical jargon (gas, chain, liquidity, score). Use simple words like "transaction fees", "digital path", "network costs".
+        5. Do not include introductory greetings.
       `;
 
       // Using gemini-2.0-flash (current stable model)
@@ -83,8 +84,8 @@ ${routeLines}
 
       return text;
     } catch (e) {
-      console.error('Kendala saat menghubungi Gemini API:', e);
-      return `Opsi pembayaran terbaik saat ini adalah menggunakan ${routeData.token} via jaringan ${routeData.chain}. Dipilih dari ${candidates.length} rute yang dievaluasi.`;
+      console.error('Error contacting Gemini API:', e);
+      return `The best payment option currently is using ${routeData.token} via the ${routeData.chain} network. Selected from ${candidates.length} evaluated routes.`;
     }
   }
 }
