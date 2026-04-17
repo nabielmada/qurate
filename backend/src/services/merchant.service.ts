@@ -18,8 +18,8 @@ export class MerchantService {
      * @dev Robust Supabase Initialization
      * Scans multiple naming conventions to ensure production compatibility.
      */
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_KEY || '';
 
     if (!supabaseUrl || !supabaseKey) {
       console.warn('⚠️ Supabase credentials missing! Backend will have restricted functionality.');
@@ -46,7 +46,7 @@ export class MerchantService {
   async createMerchant(name: string, walletAddress: string): Promise<{ success: boolean; data?: Merchant; message?: string }> {
     try {
       const id = `m_${uuidv4().substring(0, 8)}`;
-      
+
       const newMerchant: Merchant = {
         id,
         name,
