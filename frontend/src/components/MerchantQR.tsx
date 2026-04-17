@@ -19,8 +19,9 @@ export default function MerchantQR({
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Format: qurate://pay?merchant=ID&amount_idr=NOMINAL&accept=ANY&txid=TXID&expires=TIMESTAMP
-  const qrString = `qurate://pay?merchant=${merchantId}&amount_idr=${amountIdr}&accept=ANY&txid=${txId}&expires=${expires}`;
+  // Default origin fallback for SSR
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const qrString = `${origin}/payment?merchant=${merchantId}&amount=${amountIdr}&accept=ANY&txid=${txId}&expires=${expires}`;
 
   // Countdown logic
   useEffect(() => {
@@ -72,8 +73,8 @@ export default function MerchantQR({
 
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-xl max-w-sm mx-auto border border-gray-100">
-      <h2 className="text-xl font-bold text-gray-800 mb-2">Scan untuk Membayar</h2>
-      <p className="text-gray-500 mb-6 text-sm text-center">Scan menggunakan aplikasi Qurate</p>
+      <h2 className="text-xl font-bold text-gray-800 mb-2">Scan to Pay</h2>
+      <p className="text-gray-500 mb-6 text-sm text-center">Scan using the Qurate app</p>
       
       <div className="bg-gray-50 p-4 rounded-xl mb-4">
         <canvas ref={canvasRef}></canvas>
@@ -81,17 +82,17 @@ export default function MerchantQR({
       
       <div className="flex flex-col items-center mb-6 w-full">
         <p className="text-3xl font-black text-gray-900 mb-1">
-          Rp {amountIdr.toLocaleString('id-ID')}
+          Rp {amountIdr.toLocaleString('en-US')}
         </p>
         
         {timeLeft > 0 ? (
           <p className="text-sm font-medium text-amber-600 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            Kadaluarsa dalam: {formatTime(timeLeft)}
+            Expires in: {formatTime(timeLeft)}
           </p>
         ) : (
           <p className="text-sm font-medium text-red-500 flex items-center gap-2">
-            QR Code Kadaluarsa
+            QR Code Expired
           </p>
         )}
       </div>

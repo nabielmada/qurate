@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { WalletScannerService } from './services/wallet-scanner.service';
 import { AiRouterService } from './services/ai-router.service';
 import { AiExplainerService } from './services/ai-explainer.service';
+import { CurrencyService } from './services/currency.service';
+import { MerchantService } from './services/merchant.service';
 
 @Module({
   imports: [],
@@ -13,6 +15,8 @@ import { AiExplainerService } from './services/ai-explainer.service';
     WalletScannerService,
     AiRouterService,
     AiExplainerService,
+    CurrencyService,
+    MerchantService,
   ],
 })
 export class AppModule {}

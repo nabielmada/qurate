@@ -4,7 +4,9 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAccount, useDisconnect } from 'wagmi';
 import { useRouter } from 'next/navigation';
 
-export const DUMMY_ADDRESS = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"; // Vitalik
+export const DUMMY_ADDRESS = "0xGUEST";
+
+export type CurrencyCode = 'IDR' | 'USD' | 'MYR' | 'SGD' | 'EUR';
 
 interface WalletContextType {
   address: string | undefined;
@@ -12,6 +14,8 @@ interface WalletContextType {
   setGuestMode: () => void;
   isConnected: boolean;
   logout: () => void;
+  currency: CurrencyCode;
+  setCurrency: (c: CurrencyCode) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -21,14 +25,35 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { disconnect } = useDisconnect();
   const [isGuest, setIsGuest] = useState(false);
   const router = useRouter();
+  
+  // Default to USD for global appeal
+  const [currency, setCurrencyState] = useState<CurrencyCode>('USD');
+
+  // Persistence
+  useEffect(() => {
+    // 1. Load Currency
+    const savedCurrency = localStorage.getItem('qurate_currency') as CurrencyCode;
+    if (savedCurrency) setCurrencyState(savedCurrency);
+
+    // 2. Load Guest Mode
+    const savedGuest = localStorage.getItem('qurate_is_guest');
+    if (savedGuest === 'true') setIsGuest(true);
+  }, []);
+
+  const setCurrency = (c: CurrencyCode) => {
+    setCurrencyState(c);
+    localStorage.setItem('qurate_currency', c);
+  };
 
   const setGuestMode = () => {
     setIsGuest(true);
-    router.push('/user'); // Auto redirect to dashboard as per user request
+    localStorage.setItem('qurate_is_guest', 'true');
+    router.push('/user'); 
   };
 
   const logout = () => {
     setIsGuest(false);
+    localStorage.removeItem('qurate_is_guest');
     disconnect();
     router.push('/');
   };
@@ -48,7 +73,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       isGuest, 
       setGuestMode,
       isConnected: isConnected && !isGuest,
-      logout
+      logout,
+      currency,
+      setCurrency
     }}>
       {children}
     </WalletContext.Provider>

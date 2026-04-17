@@ -1,0 +1,5 @@
+{
+  "buildCommand": "npm run build --filter=frontend",
+  "installCommand": "npm install",
+  "framework": "nextjs"
+}
