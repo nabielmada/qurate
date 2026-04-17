@@ -14,10 +14,18 @@ export class MerchantService {
   private supabase: SupabaseClient;
 
   constructor() {
-    this.supabase = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_KEY || ''
-    );
+    /**
+     * @dev Robust Supabase Initialization
+     * Scans multiple naming conventions to ensure production compatibility.
+     */
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('⚠️ Supabase credentials missing! Backend will have restricted functionality.');
+    }
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
   async getMerchantById(id: string): Promise<Merchant | null> {
