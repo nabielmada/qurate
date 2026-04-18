@@ -8,7 +8,7 @@
 
 ---
 
-<img src="qurate-demo.gif" alt="Demo Aplikasi" width="500">
+<img src="qurate-demo.gif" alt="Demo Aplikasi">
 
 ---
 
