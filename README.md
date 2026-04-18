@@ -8,6 +8,10 @@
 
 ---
 
+![Demo Aplikasi](./qurate-demo.gif)
+
+---
+
 ## 🌟 Vision
 **Qurate** is an AI-driven Web3 payment platform that enables anyone to pay with crypto just by scanning a static QR code — without needing to understand tokens, chains, gas fees, or complex routing.
 
