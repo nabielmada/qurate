@@ -1,6 +1,6 @@
 # 🤖 Qurate: AI-Powered Web3 Payment Agent
 
-> **"The first truly autonomous AI payment agent for Web3 — where the user only needs to scan and type the amount, and the AI handles the rest."**
+> **"Autonomous AI payment agent for Web3 - where the user only needs to scan and type the amount, and the AI handles the rest."**
 
 [![Hackathon](https://img.shields.io/badge/Event-Four.meme%20AI%20Sprint%202025-blueviolet)](https://four.meme)
 [![Version](https://img.shields.io/badge/Version-2.0.0--MVP-orange)](#)
